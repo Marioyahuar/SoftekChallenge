@@ -1,0 +1,193 @@
+service: star-wars-pokemon-api
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  timeout: 30
+  memorySize: 512
+  environment:
+    STAGE: ${self:provider.stage}
+    DB_HOST: ${env:DB_HOST}
+    DB_NAME: ${env:DB_NAME}
+    DB_USER: ${env:DB_USER}
+    DB_PASSWORD: ${env:DB_PASSWORD}
+    DB_PORT: ${env:DB_PORT, '3306'}
+    REDIS_HOST: ${env:REDIS_HOST}
+    REDIS_PORT: ${env:REDIS_PORT, '6379'}
+    SWAPI_BASE_URL: ${env:SWAPI_BASE_URL, 'https://swapi.dev/api'}
+    POKEAPI_BASE_URL: ${env:POKEAPI_BASE_URL, 'https://pokeapi.co/api/v2'}
+    COGNITO_USER_POOL_ID: ${env:COGNITO_USER_POOL_ID}
+    AWS_REGION: ${self:provider.region}
+    CACHE_TTL_MINUTES: ${env:CACHE_TTL_MINUTES, '30'}
+    API_RATE_LIMIT_RPM: ${env:API_RATE_LIMIT_RPM, '60'}
+    LOG_LEVEL: ${env:LOG_LEVEL, 'info'}
+  tracing:
+    lambda: true
+    apiGateway: true
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - xray:PutTraceSegments
+            - xray:PutTelemetryRecords
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - cognito-idp:GetUser
+          Resource: 
+            - "arn:aws:cognito-idp:${self:provider.region}:*:userpool/${env:COGNITO_USER_POOL_ID}"
+
+plugins:
+  - serverless-plugin-typescript
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 3000
+    host: 0.0.0.0
+    useChildProcesses: true
+
+functions:
+  fusedData:
+    handler: src/infrastructure/adapters/http/handlers/fusedDataHandler.handler
+    description: 'Get fused Star Wars and Pokemon data with intelligent matching'
+    events:
+      - httpApi:
+          path: /fusionados
+          method: get
+          cors:
+            allowOrigins:
+              - '*'
+            allowHeaders:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowMethods:
+              - GET
+              - OPTIONS
+    reservedConcurrency: 10
+
+  customData:
+    handler: src/infrastructure/adapters/http/handlers/customDataHandler.handler
+    description: 'Store custom user data with authentication'
+    events:
+      - httpApi:
+          path: /almacenar
+          method: post
+          authorizer:
+            type: jwt
+            identitySource: $request.header.Authorization
+          cors:
+            allowOrigins:
+              - '*'
+            allowHeaders:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowMethods:
+              - POST
+              - OPTIONS
+    reservedConcurrency: 5
+
+  history:
+    handler: src/infrastructure/adapters/http/handlers/historyHandler.handler
+    description: 'Get paginated fusion history with authentication'
+    events:
+      - httpApi:
+          path: /historial
+          method: get
+          authorizer:
+            type: jwt
+            identitySource: $request.header.Authorization
+          cors:
+            allowOrigins:
+              - '*'
+            allowHeaders:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowMethods:
+              - GET
+              - OPTIONS
+    reservedConcurrency: 10
+
+resources:
+  Resources:
+    # CloudWatch Log Groups
+    FusedDataLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/lambda/${self:service}-${self:provider.stage}-fusedData
+        RetentionInDays: 14
+
+    CustomDataLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/lambda/${self:service}-${self:provider.stage}-customData
+        RetentionInDays: 14
+
+    HistoryLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/lambda/${self:service}-${self:provider.stage}-history
+        RetentionInDays: 14
+
+    # API Gateway Configuration
+    HttpApiGateway:
+      Type: AWS::ApiGatewayV2::Api
+      Properties:
+        Name: ${self:service}-${self:provider.stage}
+        ProtocolType: HTTP
+        CorsConfiguration:
+          AllowOrigins:
+            - '*'
+          AllowHeaders:
+            - Content-Type
+            - X-Amz-Date
+            - Authorization
+            - X-Api-Key
+            - X-Amz-Security-Token
+          AllowMethods:
+            - GET
+            - POST
+            - OPTIONS
+          MaxAge: 86400
+
+  Outputs:
+    ApiGatewayRestApiId:
+      Value:
+        Ref: HttpApiGateway
+      Export:
+        Name: ${self:service}-${self:provider.stage}-ApiGatewayRestApiId
+
+    ApiGatewayRestApiRootResourceId:
+      Value:
+        Fn::GetAtt:
+          - HttpApiGateway
+          - RootResourceId
+      Export:
+        Name: ${self:service}-${self:provider.stage}-ApiGatewayRestApiRootResourceId
+
+    ApiEndpoint:
+      Description: API Gateway endpoint URL
+      Value:
+        Fn::Join:
+          - ''
+          - - 'https://'
+            - Ref: HttpApiGateway
+            - '.execute-api.'
+            - ${self:provider.region}
+            - '.amazonaws.com/'
+      Export:
+        Name: ${self:service}-${self:provider.stage}-ApiEndpoint

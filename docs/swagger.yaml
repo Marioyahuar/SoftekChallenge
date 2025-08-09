@@ -1,0 +1,773 @@
+openapi: 3.0.0
+info:
+  title: Star Wars Pokemon Fusion API
+  description: |
+    API REST serverless que fusiona datos de Star Wars API (SWAPI) y PokeAPI usando un sistema de mapeo inteligente.
+    
+    ## Características principales:
+    - Fusión inteligente basada en traits de personajes
+    - Sistema de cache híbrido (Redis + DB)
+    - Autenticación con AWS Cognito JWT
+    - Rate limiting por endpoint
+    - Almacenamiento persistente en MySQL
+    
+    ## Estrategias de fusión:
+    - **intelligent**: Algoritmo de matching basado en traits y compatibilidad
+    - **random**: Selección aleatoria de Pokémon
+    - **theme**: Fusión basada en temas específicos (desert, ocean, heroic, etc.)
+    
+    ## Rate Limits:
+    - `/fusionados`: 60 requests/minuto
+    - `/almacenar`: 30 requests/minuto  
+    - `/historial`: 100 requests/minuto
+  version: 1.0.0
+  contact:
+    name: Star Wars Pokemon Fusion API
+    email: support@starwarspokemon.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.starwarspokemon.com
+    description: Production server
+  - url: https://dev-api.starwarspokemon.com
+    description: Development server
+  - url: http://localhost:3000
+    description: Local development server
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from AWS Cognito
+
+  schemas:
+    StarWarsCharacter:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: SWAPI character ID (1-82)
+          example: 1
+        name:
+          type: string
+          description: Character name
+          example: "Luke Skywalker"
+        height:
+          type: integer
+          description: Height in centimeters
+          example: 172
+        mass:
+          type: string
+          description: Mass in kilograms
+          example: "77"
+        homeworld:
+          $ref: '#/components/schemas/Homeworld'
+        traits:
+          $ref: '#/components/schemas/CharacterTraits'
+
+    Homeworld:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Tatooine"
+        climate:
+          type: string
+          example: "arid"
+        terrain:
+          type: string
+          example: "desert"
+
+    CharacterTraits:
+      type: object
+      properties:
+        environmentTraits:
+          type: array
+          items:
+            type: string
+          example: ["desert", "arid"]
+        physicalTraits:
+          type: array
+          items:
+            type: string
+          example: ["human", "average_height"]
+        personalityTraits:
+          type: array
+          items:
+            type: string
+          example: ["heroic", "brave"]
+        archetypeTraits:
+          type: array
+          items:
+            type: string
+          example: ["chosen_one", "hero"]
+
+    Pokemon:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Pokemon ID from PokeAPI
+          example: 25
+        name:
+          type: string
+          description: Pokemon name
+          example: "pikachu"
+        types:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                example: "electric"
+        stats:
+          type: array
+          items:
+            type: object
+            properties:
+              base_stat:
+                type: integer
+                example: 35
+              stat:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: "hp"
+        sprites:
+          type: object
+          properties:
+            front_default:
+              type: string
+              format: uri
+              example: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png"
+
+    FusionAnalysis:
+      type: object
+      properties:
+        fusionScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Score de compatibilidad (0.0-1.0)
+          example: 0.875
+        fusionReason:
+          type: string
+          description: Explicación de por qué se eligió esta fusión
+          example: "Pikachu was selected because it shares similar environmental preferences (heroic) and matches personality traits (brave), creating a powerful fusion bond."
+        matchingTraits:
+          type: array
+          items:
+            type: string
+          description: Traits que coinciden entre personaje y Pokémon
+          example: ["heroic", "brave", "small"]
+        compatibilityLevel:
+          type: string
+          enum: [low, medium, high, perfect]
+          description: Nivel de compatibilidad calculado
+          example: "high"
+
+    FusionMetadata:
+      type: object
+      properties:
+        cacheHit:
+          type: boolean
+          description: Si el resultado vino del cache
+          example: false
+        apiCallsMade:
+          type: integer
+          description: Número de llamadas a APIs externas realizadas
+          example: 2
+        processingTimeMs:
+          type: integer
+          description: Tiempo de procesamiento en milisegundos
+          example: 1250
+
+    FusedCharacter:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador único de la fusión
+          example: "fusion_abc123_def456"
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp de creación ISO 8601
+          example: "2024-01-15T10:30:00.000Z"
+        fusionStrategy:
+          type: string
+          enum: [intelligent, random, theme]
+          description: Estrategia utilizada para la fusión
+          example: "intelligent"
+        data:
+          type: object
+          properties:
+            starWarsCharacter:
+              $ref: '#/components/schemas/StarWarsCharacter'
+            pokemonCompanion:
+              $ref: '#/components/schemas/Pokemon'
+            fusionAnalysis:
+              $ref: '#/components/schemas/FusionAnalysis'
+        metadata:
+          $ref: '#/components/schemas/FusionMetadata'
+
+    CustomDataRequest:
+      type: object
+      required:
+        - name
+        - description
+        - category
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          description: Nombre del dato personalizado
+          example: "Mi configuración favorita"
+        description:
+          type: string
+          maxLength: 1000
+          description: Descripción detallada
+          example: "Esta es mi configuración personalizada para fusiones temáticas"
+        category:
+          type: string
+          maxLength: 100
+          description: Categoría del dato
+          example: "configuracion"
+        metadata:
+          type: object
+          description: Metadatos adicionales (máximo 5000 caracteres serializados)
+          example: {"color": "blue", "priority": 5}
+        tags:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 50
+          description: Etiquetas para organización
+          example: ["favorito", "personalizado"]
+
+    CustomDataResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              example: "550e8400-e29b-41d4-a716-446655440000"
+            name:
+              type: string
+              example: "Mi configuración favorita"
+            description:
+              type: string
+              example: "Esta es mi configuración personalizada para fusiones temáticas"
+            category:
+              type: string
+              example: "configuracion"
+            metadata:
+              type: object
+              example: {"color": "blue", "priority": 5}
+            tags:
+              type: array
+              items:
+                type: string
+              example: ["favorito", "personalizado"]
+            userId:
+              type: string
+              example: "user123"
+            createdAt:
+              type: string
+              format: date-time
+              example: "2024-01-15T10:30:00.000Z"
+        message:
+          type: string
+          example: "Custom data stored successfully"
+
+    HistoryResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/FusedCharacter'
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+              example: 1
+            limit:
+              type: integer
+              example: 10
+            total:
+              type: integer
+              example: 150
+            totalPages:
+              type: integer
+              example: 15
+            hasNext:
+              type: boolean
+              example: true
+            hasPrevious:
+              type: boolean
+              example: false
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Código de error específico
+              example: "VALIDATION_ERROR"
+            message:
+              type: string
+              description: Mensaje descriptivo del error
+              example: "Validation error: character must be between 1 and 82"
+            details:
+              type: string
+              description: Detalles adicionales (solo en desarrollo)
+              example: "Invalid character ID provided"
+            timestamp:
+              type: string
+              format: date-time
+              example: "2024-01-15T10:30:00.000Z"
+            requestId:
+              type: string
+              description: ID único de la petición para tracking
+              example: "req_abc123def456"
+
+paths:
+  /fusionados:
+    get:
+      tags:
+        - Fusion
+      summary: Obtener datos fusionados de Star Wars y Pokémon
+      description: |
+        Fusiona personajes de Star Wars con Pokémon usando algoritmo inteligente de matching basado en traits.
+        
+        ### Estrategias disponibles:
+        - **intelligent** (default): Usa algoritmo de scoring completo basado en traits
+        - **random**: Selección aleatoria de Pokémon  
+        - **theme**: Filtra por tema específico
+        
+        ### Temas disponibles (con strategy=theme):
+        - desert, ocean, forest, ice, urban, mechanical, heroic, dark_side
+        
+        ### Cache:
+        - TTL: 30 minutos
+        - Las respuestas se almacenan automáticamente en base de datos
+        
+        ### Rate Limit: 60 requests/minuto
+      parameters:
+        - name: character
+          in: query
+          description: ID del personaje SWAPI (1-82). Si no se especifica, se usa ID 1 o aleatorio si random=true
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 82
+            example: 1
+        - name: strategy
+          in: query
+          description: Estrategia de fusión a utilizar
+          required: false
+          schema:
+            type: string
+            enum: [intelligent, random, theme]
+            default: intelligent
+            example: intelligent
+        - name: theme
+          in: query
+          description: Tema específico (requerido si strategy=theme)
+          required: false
+          schema:
+            type: string
+            enum: [desert, ocean, forest, ice, urban, mechanical, heroic, dark_side]
+            example: heroic
+        - name: limit
+          in: query
+          description: Número de fusiones a generar (1-10)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 1
+            example: 1
+        - name: random
+          in: query
+          description: Si usar personaje aleatorio en lugar del especificado
+          required: false
+          schema:
+            type: boolean
+            default: false
+            example: false
+      responses:
+        '200':
+          description: Fusión exitosa
+          headers:
+            X-RateLimit-Limit:
+              description: Límite de requests por ventana
+              schema:
+                type: integer
+                example: 60
+            X-RateLimit-Remaining:
+              description: Requests restantes en la ventana actual
+              schema:
+                type: integer
+                example: 59
+            X-RateLimit-Reset:
+              description: Timestamp cuando se reinicia la ventana
+              schema:
+                type: integer
+                example: 1642248600
+            X-Processing-Time:
+              description: Tiempo de procesamiento en milisegundos
+              schema:
+                type: integer
+                example: 1250
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/FusedCharacter'
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/FusedCharacter'
+              examples:
+                single_fusion:
+                  summary: Fusión única (limit=1)
+                  value:
+                    id: "fusion_abc123_def456"
+                    timestamp: "2024-01-15T10:30:00.000Z"
+                    fusionStrategy: "intelligent"
+                    data:
+                      starWarsCharacter:
+                        id: 1
+                        name: "Luke Skywalker"
+                        height: 172
+                        mass: "77"
+                        homeworld:
+                          name: "Tatooine"
+                          climate: "arid"
+                          terrain: "desert"
+                        traits:
+                          environmentTraits: ["desert"]
+                          physicalTraits: ["human", "average_height"]
+                          personalityTraits: ["heroic", "brave"]
+                          archetypeTraits: ["chosen_one", "hero"]
+                      pokemonCompanion:
+                        id: 25
+                        name: "pikachu"
+                        types: [{"name": "electric"}]
+                        stats: [{"base_stat": 35, "stat": {"name": "hp"}}]
+                        sprites:
+                          front_default: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png"
+                      fusionAnalysis:
+                        fusionScore: 0.875
+                        fusionReason: "Pikachu was selected because it matches personality traits (heroic, brave), creating a powerful fusion bond."
+                        matchingTraits: ["heroic", "brave"]
+                        compatibilityLevel: "high"
+                    metadata:
+                      cacheHit: false
+                      apiCallsMade: 2
+                      processingTimeMs: 1250
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                validation_error:
+                  summary: Error de validación de parámetros
+                  value:
+                    error:
+                      code: "VALIDATION_ERROR"
+                      message: "Validation error: character must be between 1 and 82"
+                      timestamp: "2024-01-15T10:30:00.000Z"
+                      requestId: "req_abc123def456"
+        '429':
+          description: Rate limit excedido
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+                example: 60
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+                example: 0
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+                example: 1642248600
+            Retry-After:
+              schema:
+                type: integer
+                example: 30
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: "RATE_LIMIT_EXCEEDED"
+                  message: "Too many requests. Please try again later."
+                  timestamp: "2024-01-15T10:30:00.000Z"
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: Error de API externa (SWAPI/PokeAPI)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /almacenar:
+    post:
+      tags:
+        - Custom Data
+      summary: Almacenar datos personalizados del usuario
+      description: |
+        Permite a los usuarios autenticados almacenar información personalizada en la base de datos.
+        
+        ### Validaciones:
+        - Nombre: requerido, máximo 255 caracteres
+        - Descripción: requerida, máximo 1000 caracteres
+        - Categoría: requerida, máximo 100 caracteres
+        - Tags: máximo 10 items, cada uno máximo 50 caracteres
+        - Metadata: máximo 5000 caracteres cuando se serializa a JSON
+        
+        ### Rate Limit: 30 requests/minuto
+        ### Autenticación: Requerida (JWT Token)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomDataRequest'
+            examples:
+              basic_data:
+                summary: Datos básicos
+                value:
+                  name: "Mi configuración favorita"
+                  description: "Esta es mi configuración personalizada para fusiones temáticas"
+                  category: "configuracion"
+              complete_data:
+                summary: Datos completos con metadata y tags
+                value:
+                  name: "Configuración avanzada"
+                  description: "Configuración completa con metadatos y etiquetas"
+                  category: "configuracion"
+                  metadata:
+                    theme: "dark"
+                    priority: 5
+                    settings:
+                      notifications: true
+                      autoSave: false
+                  tags: ["favorito", "personalizado", "avanzado"]
+      responses:
+        '201':
+          description: Datos almacenados exitosamente
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+                example: 30
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+                example: 29
+            X-Processing-Time:
+              schema:
+                type: integer
+                example: 450
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomDataResponse'
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: No autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: "UNAUTHORIZED"
+                  message: "Authentication required or invalid token"
+                  timestamp: "2024-01-15T10:30:00.000Z"
+        '429':
+          description: Rate limit excedido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /historial:
+    get:
+      tags:
+        - History
+      summary: Obtener historial paginado de fusiones
+      description: |
+        Retorna el historial de todas las fusiones almacenadas del usuario autenticado, con paginación y ordenamiento.
+        
+        ### Características:
+        - Paginación configurable (1-100 items por página)
+        - Ordenamiento por timestamp, fusionScore, o strategy
+        - Solo muestra datos del usuario autenticado
+        - Orden ascendente o descendente
+        
+        ### Rate Limit: 100 requests/minuto
+        ### Autenticación: Requerida (JWT Token)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Número de página (mínimo 1)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+            example: 1
+        - name: limit
+          in: query
+          description: Elementos por página (1-100)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+            example: 10
+        - name: sortBy
+          in: query
+          description: Campo por el cual ordenar
+          required: false
+          schema:
+            type: string
+            enum: [timestamp, fusionScore, strategy]
+            default: timestamp
+            example: timestamp
+        - name: order
+          in: query
+          description: Orden de clasificación
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+            example: desc
+      responses:
+        '200':
+          description: Historial obtenido exitosamente
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+                example: 100
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+                example: 99
+            X-Processing-Time:
+              schema:
+                type: integer
+                example: 680
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryResponse'
+              example:
+                data:
+                  - id: "fusion_abc123_def456"
+                    timestamp: "2024-01-15T10:30:00.000Z"
+                    fusionStrategy: "intelligent"
+                    data:
+                      starWarsCharacter:
+                        id: 1
+                        name: "Luke Skywalker"
+                      pokemonCompanion:
+                        id: 25
+                        name: "pikachu"
+                      fusionAnalysis:
+                        fusionScore: 0.875
+                        compatibilityLevel: "high"
+                    metadata:
+                      cacheHit: false
+                      apiCallsMade: 2
+                      processingTimeMs: 1250
+                pagination:
+                  page: 1
+                  limit: 10
+                  total: 150
+                  totalPages: 15
+                  hasNext: true
+                  hasPrevious: false
+        '401':
+          description: No autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '400':
+          description: Parámetros de consulta inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit excedido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+tags:
+  - name: Fusion
+    description: Endpoints relacionados con la fusión de datos Star Wars y Pokémon
+  - name: Custom Data
+    description: Almacenamiento de datos personalizados del usuario
+  - name: History
+    description: Consulta del historial de fusiones almacenadas
+
+x-tagGroups:
+  - name: API Endpoints
+    tags:
+      - Fusion
+      - Custom Data
+      - History
