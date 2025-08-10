@@ -1,3 +1,6 @@
+import { config } from 'dotenv';
+config();
+
 import { MySQLConnection } from '../connection';
 import { seedTraitMappings } from './001_trait_pokemon_mappings';
 

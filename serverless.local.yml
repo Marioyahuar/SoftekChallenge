@@ -1,0 +1,90 @@
+service: star-wars-pokemon-api
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: local
+  region: ${opt:region, 'us-east-1'}
+  timeout: 30
+  memorySize: 512
+  environment:
+    STAGE: local
+    DB_HOST: ${env:DB_HOST}
+    DB_NAME: ${env:DB_NAME}
+    DB_USER: ${env:DB_USER}
+    DB_PASSWORD: ${env:DB_PASSWORD}
+    DB_PORT: ${env:DB_PORT, '3306'}
+    REDIS_HOST: ${env:REDIS_HOST}
+    REDIS_PORT: ${env:REDIS_PORT, '6379'}
+    SWAPI_BASE_URL: ${env:SWAPI_BASE_URL, 'https://swapi.dev/api'}
+    POKEAPI_BASE_URL: ${env:POKEAPI_BASE_URL, 'https://pokeapi.co/api/v2'}
+    COGNITO_USER_POOL_ID: ${env:COGNITO_USER_POOL_ID, 'local-dev-pool'}
+    AWS_REGION: ${self:provider.region}
+    CACHE_TTL_MINUTES: ${env:CACHE_TTL_MINUTES, '30'}
+    API_RATE_LIMIT_RPM: ${env:API_RATE_LIMIT_RPM, '60'}
+    LOG_LEVEL: ${env:LOG_LEVEL, 'debug'}
+    NODE_ENV: development
+
+plugins:
+  - serverless-plugin-typescript
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 3000
+    host: 0.0.0.0
+    useChildProcesses: true
+
+functions:
+  fusedData:
+    handler: src/infrastructure/adapters/http/handlers/fusedDataHandler.handler
+    description: 'Get fused Star Wars and Pokemon data with intelligent matching'
+    events:
+      - httpApi:
+          path: /fusionados/{id}
+          method: get
+          cors:
+            allowOrigins:
+              - '*'
+            allowHeaders:
+              - Content-Type
+              - Authorization
+            allowMethods:
+              - GET
+              - OPTIONS
+
+  customData:
+    handler: src/infrastructure/adapters/http/handlers/customDataHandler.handler
+    description: 'Store custom user data - NO AUTH in local dev'
+    events:
+      - httpApi:
+          path: /almacenar
+          method: post
+          cors:
+            allowOrigins:
+              - '*'
+            allowHeaders:
+              - Content-Type
+              - Authorization
+            allowMethods:
+              - POST
+              - OPTIONS
+
+  history:
+    handler: src/infrastructure/adapters/http/handlers/historyHandler.handler
+    description: 'Get paginated fusion history - NO AUTH in local dev'
+    events:
+      - httpApi:
+          path: /historial/{userId}
+          method: get
+          cors:
+            allowOrigins:
+              - '*'
+            allowHeaders:
+              - Content-Type
+              - Authorization
+            allowMethods:
+              - GET
+              - OPTIONS

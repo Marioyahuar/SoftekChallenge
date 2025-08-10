@@ -79,10 +79,36 @@ export class CharacterTraitsRepository implements ICharacterTraitsRepository {
   private mapRowToCharacterTraits(row: any): CharacterTraits {
     return CharacterTraits.create({
       characterId: row.character_id,
-      environmentTraits: JSON.parse(row.environment_traits),
-      physicalTraits: JSON.parse(row.physical_traits),
-      personalityTraits: JSON.parse(row.personality_traits),
-      archetypeTraits: JSON.parse(row.archetype_traits),
+      environmentTraits: this.parseTraitField(row.environment_traits),
+      physicalTraits: this.parseTraitField(row.physical_traits),
+      personalityTraits: this.parseTraitField(row.personality_traits),
+      archetypeTraits: this.parseTraitField(row.archetype_traits),
     });
+  }
+
+  private parseTraitField(field: any): string[] {
+    if (!field) return [];
+    
+    // Si ya es un array, devolverlo directamente
+    if (Array.isArray(field)) {
+      return field;
+    }
+    
+    // Si es string, intentar parsearlo como JSON
+    if (typeof field === 'string') {
+      try {
+        const parsed = JSON.parse(field);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+        // Si no es array después del parse, tratarlo como string separado por comas
+        return field.split(',').map(t => t.trim()).filter(t => t.length > 0);
+      } catch (error) {
+        // Si falla el parse, tratarlo como string separado por comas
+        return field.split(',').map(t => t.trim()).filter(t => t.length > 0);
+      }
+    }
+    
+    return [];
   }
 }

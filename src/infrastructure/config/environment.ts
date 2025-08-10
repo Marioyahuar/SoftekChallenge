@@ -22,6 +22,8 @@ export interface EnvironmentConfig {
     cacheTimeMinutes: number;
     apiRateLimitRpm: number;
     logLevel: string;
+    nodeEnv: string;
+    adminUserIds: string[];
   };
 }
 
@@ -49,5 +51,7 @@ export const environment: EnvironmentConfig = {
     cacheTimeMinutes: parseInt(process.env.CACHE_TTL_MINUTES || '30'),
     apiRateLimitRpm: parseInt(process.env.API_RATE_LIMIT_RPM || '60'),
     logLevel: process.env.LOG_LEVEL || 'info',
+    nodeEnv: process.env.NODE_ENV || 'development',
+    adminUserIds: (process.env.ADMIN_USER_IDS || 'admin').split(',').map(id => id.trim()),
   },
 };

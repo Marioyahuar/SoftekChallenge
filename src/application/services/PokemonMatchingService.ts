@@ -4,14 +4,7 @@ import { FusionStrategy } from '../../domain/value-objects/FusionStrategy';
 import { FusionScore } from '../../domain/value-objects/FusionScore';
 import { NoMatchingPokemonError } from '../../domain/errors/FusionError';
 import { PokeApiService } from '../../infrastructure/adapters/external-apis/pokeapi/PokeApiService';
-
-export interface TraitPokemonMapping {
-  traitName: string;
-  pokemonId: number;
-  weight: number;
-  reasoning: string;
-  category: 'environment' | 'physical' | 'personality' | 'archetype';
-}
+import { ITraitMappingRepository, TraitPokemonMapping } from '../ports/repositories/ITraitMappingRepository';
 
 export interface PokemonMatch {
   pokemon: Pokemon;
@@ -22,48 +15,11 @@ export interface PokemonMatch {
 
 export class PokemonMatchingService {
   private pokeApiService: PokeApiService;
-  private traitMappings: TraitPokemonMapping[];
+  private traitMappingRepository: ITraitMappingRepository;
 
-  constructor(pokeApiService: PokeApiService) {
+  constructor(pokeApiService: PokeApiService, traitMappingRepository: ITraitMappingRepository) {
     this.pokeApiService = pokeApiService;
-    this.initializeTraitMappings();
-  }
-
-  private initializeTraitMappings(): void {
-    this.traitMappings = [
-      { traitName: 'desert', pokemonId: 27, weight: 0.9, reasoning: 'Desert-dwelling ground type', category: 'environment' },
-      { traitName: 'desert', pokemonId: 28, weight: 0.85, reasoning: 'Enhanced desert adaptation', category: 'environment' },
-      { traitName: 'desert', pokemonId: 104, weight: 0.8, reasoning: 'Bone collector in arid lands', category: 'environment' },
-      { traitName: 'ocean', pokemonId: 7, weight: 0.9, reasoning: 'Water starter, ocean dweller', category: 'environment' },
-      { traitName: 'ocean', pokemonId: 8, weight: 0.85, reasoning: 'Advanced water abilities', category: 'environment' },
-      { traitName: 'ocean', pokemonId: 9, weight: 0.95, reasoning: 'Ultimate water type evolution', category: 'environment' },
-      { traitName: 'ice', pokemonId: 87, weight: 0.9, reasoning: 'Ice/Water dual type', category: 'environment' },
-      { traitName: 'ice', pokemonId: 91, weight: 0.85, reasoning: 'Spiky ice shell', category: 'environment' },
-      { traitName: 'ice', pokemonId: 144, weight: 0.95, reasoning: 'Legendary ice bird', category: 'environment' },
-      { traitName: 'forest', pokemonId: 1, weight: 0.9, reasoning: 'Grass starter, forest dweller', category: 'environment' },
-      { traitName: 'forest', pokemonId: 43, weight: 0.8, reasoning: 'Grass type, forest habitat', category: 'environment' },
-      { traitName: 'forest', pokemonId: 45, weight: 0.85, reasoning: 'Flower Pokemon, forest guardian', category: 'environment' },
-      { traitName: 'mechanical', pokemonId: 81, weight: 0.95, reasoning: 'Electric/Steel, pure machine', category: 'physical' },
-      { traitName: 'mechanical', pokemonId: 82, weight: 0.9, reasoning: 'Evolved magnetic Pokemon', category: 'physical' },
-      { traitName: 'mechanical', pokemonId: 137, weight: 0.85, reasoning: 'Digital Pokemon, artificial', category: 'physical' },
-      { traitName: 'artificial', pokemonId: 137, weight: 0.9, reasoning: 'Man-made digital creature', category: 'physical' },
-      { traitName: 'heroic', pokemonId: 25, weight: 0.95, reasoning: 'Iconic hero Pokemon', category: 'personality' },
-      { traitName: 'heroic', pokemonId: 6, weight: 0.9, reasoning: 'Dragon-like protector', category: 'personality' },
-      { traitName: 'heroic', pokemonId: 150, weight: 0.85, reasoning: 'Legendary psychic protector', category: 'personality' },
-      { traitName: 'dark_side', pokemonId: 94, weight: 0.95, reasoning: 'Ghost type, dark presence', category: 'personality' },
-      { traitName: 'dark_side', pokemonId: 169, weight: 0.9, reasoning: 'Evolved poison/flying menace', category: 'personality' },
-      { traitName: 'intimidating', pokemonId: 6, weight: 0.8, reasoning: 'Fire/Flying dragon-like', category: 'personality' },
-      { traitName: 'wise', pokemonId: 65, weight: 0.9, reasoning: 'Psychic sage', category: 'personality' },
-      { traitName: 'wise', pokemonId: 150, weight: 0.95, reasoning: 'Legendary psychic master', category: 'personality' },
-      { traitName: 'small', pokemonId: 25, weight: 0.8, reasoning: 'Small electric mouse', category: 'physical' },
-      { traitName: 'small', pokemonId: 104, weight: 0.85, reasoning: 'Small ground type', category: 'physical' },
-      { traitName: 'tall', pokemonId: 6, weight: 0.8, reasoning: 'Large fire dragon', category: 'physical' },
-      { traitName: 'tall', pokemonId: 150, weight: 0.85, reasoning: 'Tall psychic legendary', category: 'physical' },
-      { traitName: 'droid', pokemonId: 81, weight: 0.95, reasoning: 'Robotic appearance', category: 'archetype' },
-      { traitName: 'companion', pokemonId: 25, weight: 0.9, reasoning: 'Loyal partner Pokemon', category: 'archetype' },
-      { traitName: 'royalty', pokemonId: 150, weight: 0.9, reasoning: 'Legendary status', category: 'archetype' },
-      { traitName: 'chosen_one', pokemonId: 150, weight: 0.95, reasoning: 'Ultimate legendary Pokemon', category: 'archetype' },
-    ];
+    this.traitMappingRepository = traitMappingRepository;
   }
 
   public async findBestMatch(
@@ -89,7 +45,7 @@ export class PokemonMatchingService {
       }
 
       const pokemon = await this.pokeApiService.getPokemon(pokemonId);
-      const { fusionScore, matchingTraits, fusionReason } = this.calculateFusionScore(traits, pokemon, strategy);
+      const { fusionScore, matchingTraits, fusionReason } = await this.calculateFusionScore(traits, pokemon, strategy);
 
       return {
         pokemon,
@@ -110,7 +66,7 @@ export class PokemonMatchingService {
     const allTraits = traits.getAllTraits();
 
     for (const trait of allTraits) {
-      const mappings = this.traitMappings.filter(m => m.traitName === trait);
+      const mappings = await this.traitMappingRepository.findActiveByTraitName(trait);
       
       for (const mapping of mappings) {
         const currentScore = scores.get(mapping.pokemonId) || 0;
@@ -123,7 +79,7 @@ export class PokemonMatchingService {
     }
 
     const sortedScores = Array.from(scores.entries()).sort((a, b) => b[1] - a[1]);
-    return sortedScores[0][0];
+    return sortedScores[0]?.[0] ?? await this.getFallbackPokemon(traits);
   }
 
   private async randomMatch(): Promise<number> {
@@ -142,9 +98,9 @@ export class PokemonMatchingService {
       urban: [25, 81, 100, 137],
     };
 
-    const pokemonIds = themeMappings[theme] || themeMappings.heroic;
+    const pokemonIds = themeMappings[theme] || themeMappings.heroic || [25];
     const randomIndex = Math.floor(Math.random() * pokemonIds.length);
-    return pokemonIds[randomIndex];
+    return pokemonIds[randomIndex] || 25;
   }
 
   private async getFallbackPokemon(traits: CharacterTraits): Promise<number> {
@@ -167,20 +123,19 @@ export class PokemonMatchingService {
     return 1;
   }
 
-  private calculateFusionScore(
+  private async calculateFusionScore(
     traits: CharacterTraits,
     pokemon: Pokemon,
     strategy: FusionStrategy
-  ): { fusionScore: FusionScore; matchingTraits: string[]; fusionReason: string } {
+  ): Promise<{ fusionScore: FusionScore; matchingTraits: string[]; fusionReason: string }> {
     const allTraits = traits.getAllTraits();
     const matchingTraits: string[] = [];
     let totalScore = 0;
     let maxPossibleScore = 0;
 
     for (const trait of allTraits) {
-      const mapping = this.traitMappings.find(
-        m => m.traitName === trait && m.pokemonId === pokemon.id
-      );
+      const mappings = await this.traitMappingRepository.findActiveByTraitName(trait);
+      const mapping = mappings.find(m => m.pokemonId === pokemon.id);
       
       if (mapping) {
         matchingTraits.push(trait);

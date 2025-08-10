@@ -31,7 +31,7 @@ export class StarWarsCharacter {
       data.name,
       parseInt(data.height) || 0,
       data.mass,
-      data.birth_year,
+      data.birth_year, // This maps to birthYear property
       data.species,
       data.gender,
       data.homeworld

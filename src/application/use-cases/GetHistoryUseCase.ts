@@ -7,6 +7,7 @@ export interface GetHistoryRequest {
   sortBy?: string;
   order?: 'asc' | 'desc';
   userId?: string;
+  isAdmin?: boolean;
 }
 
 export interface GetHistoryResponse {
@@ -32,7 +33,15 @@ export class GetHistoryUseCase {
 
     let result;
 
-    if (request.userId) {
+    if (request.isAdmin) {
+      // Admin puede ver todos los registros
+      result = await this.fusedDataRepository.findAll(
+        page,
+        limit,
+        sortBy,
+        order
+      );
+    } else if (request.userId) {
       result = await this.fusedDataRepository.findByUserId(
         request.userId,
         page,

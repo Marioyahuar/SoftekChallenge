@@ -1,37 +1,59 @@
-import { HttpClient } from '../HttpClient';
-import { apisConfig } from '../../../config/apis';
-import { StarWarsCharacter } from '../../../../domain/entities/StarWarsCharacter';
-import { SwapiError } from '../../../../domain/errors/ExternalApiError';
-import { SwapiPerson, SwapiPlanet, SwapiSpecies } from './types';
+import { HttpClient } from "../HttpClient";
+import { apisConfig } from "../../../config/apis";
+import { StarWarsCharacter } from "../../../../domain/entities/StarWarsCharacter";
+import { SwapiError } from "../../../../domain/errors/ExternalApiError";
+import { SwapiPerson, SwapiPlanet, SwapiSpecies } from "./types";
 
 export class SwapiService {
   private httpClient: HttpClient;
 
   constructor() {
-    this.httpClient = new HttpClient(apisConfig.swapi, 'SWAPI');
+    this.httpClient = new HttpClient(apisConfig.swapi, "SWAPI");
   }
 
-  public async getCharacter(id: number): Promise<StarWarsCharacter> {
+  public async getCharacter(id: number): Promise<{ character: StarWarsCharacter; apiCallsCount: number }> {
     try {
+      let apiCallsCount = 0;
+      
       if (id < 1 || id > 82) {
-        throw new SwapiError(`Character ID must be between 1 and 82, got: ${id}`);
+        throw new SwapiError(
+          `Character ID must be between 1 and 82, got: ${id}`
+        );
       }
 
-      const person = await this.httpClient.get<SwapiPerson>(`${apisConfig.swapi.endpoints.people}/${id}/`);
-      
+      console.log('SWAPI Debug:', {
+        baseURL: apisConfig.swapi.baseURL,
+        endpoint: `${apisConfig.swapi.endpoints.people}/${id}/`,
+        fullURL: `${apisConfig.swapi.baseURL}${apisConfig.swapi.endpoints.people}/${id}/`
+      });
+
+      const person = await this.httpClient.get<SwapiPerson>(
+        `${apisConfig.swapi.endpoints.people}/${id}/`
+      );
+      apiCallsCount++; // 1st call: person
+
+      console.log('Person data:', {
+        name: person.name,
+        homeworld: person.homeworld,
+        species: person.species
+      });
+
       const homeworldId = this.extractIdFromUrl(person.homeworld);
       const homeworld = await this.getPlanet(homeworldId);
-      
-      let speciesName = 'Unknown';
-      if (person.species.length > 0) {
+      apiCallsCount++; // 2nd call: planet
+
+      let speciesName = "Unknown";
+      if (person.species && person.species.length > 0 && person.species[0]) {
         const speciesId = this.extractIdFromUrl(person.species[0]);
         const species = await this.getSpecies(speciesId);
+        apiCallsCount++; // 3rd call: species
         speciesName = species.name;
       } else {
-        speciesName = 'Human';
+        speciesName = "Human";
+        // No API call needed for Human default
       }
 
-      return StarWarsCharacter.create({
+      const character = StarWarsCharacter.create({
         id,
         name: person.name,
         height: person.height,
@@ -45,6 +67,8 @@ export class SwapiService {
           terrain: homeworld.terrain,
         },
       });
+
+      return { character, apiCallsCount };
     } catch (error) {
       if (error instanceof SwapiError) {
         throw error;
@@ -55,7 +79,9 @@ export class SwapiService {
 
   private async getPlanet(id: number): Promise<SwapiPlanet> {
     try {
-      return await this.httpClient.get<SwapiPlanet>(`${apisConfig.swapi.endpoints.planets}/${id}/`);
+      return await this.httpClient.get<SwapiPlanet>(
+        `${apisConfig.swapi.endpoints.planets}/${id}/`
+      );
     } catch (error) {
       throw new SwapiError(`Failed to fetch planet ${id}: ${error}`);
     }
@@ -63,18 +89,33 @@ export class SwapiService {
 
   private async getSpecies(id: number): Promise<SwapiSpecies> {
     try {
-      return await this.httpClient.get<SwapiSpecies>(`${apisConfig.swapi.endpoints.species}/${id}/`);
+      return await this.httpClient.get<SwapiSpecies>(
+        `${apisConfig.swapi.endpoints.species}/${id}/`
+      );
     } catch (error) {
       throw new SwapiError(`Failed to fetch species ${id}: ${error}`);
     }
   }
 
   private extractIdFromUrl(url: string): number {
-    const matches = url.match(/\/(\d+)\/$/);
+    console.log('Extracting ID from URL:', url);
+    
+    // Try different patterns for different API formats
+    let matches = url.match(/\/(\d+)\/$/);  // Original format: /1/
+    if (!matches) {
+      matches = url.match(/\/(\d+)$/);     // Without trailing slash: /1
+    }
+    if (!matches) {
+      matches = url.match(/(\d+)$/);       // Just the number at the end
+    }
+    
     if (!matches || !matches[1]) {
       throw new SwapiError(`Invalid URL format: ${url}`);
     }
-    return parseInt(matches[1], 10);
+    
+    const id = parseInt(matches[1], 10);
+    console.log('Extracted ID:', id);
+    return id;
   }
 
   public async getRandomCharacterId(): Promise<number> {
@@ -83,16 +124,16 @@ export class SwapiService {
 
   public async getAllCharacters(): Promise<StarWarsCharacter[]> {
     const characters: StarWarsCharacter[] = [];
-    
+
     for (let i = 1; i <= 82; i++) {
       try {
-        const character = await this.getCharacter(i);
+        const { character } = await this.getCharacter(i);
         characters.push(character);
       } catch (error) {
         console.warn(`Failed to fetch character ${i}:`, error);
       }
     }
-    
+
     return characters;
   }
 }

@@ -1,7 +1,7 @@
 import { DomainError } from './DomainError';
 
 export class FusionError extends DomainError {
-  public readonly code = 'FUSION_ERROR';
+  public readonly code: string = 'FUSION_ERROR';
 
   constructor(message: string) {
     super(message);

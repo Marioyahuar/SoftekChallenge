@@ -108,6 +108,7 @@ dist
 # Build outputs
 build/
 dist/
+.build/
 
 # IDE files
 .vscode/

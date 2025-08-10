@@ -20,7 +20,7 @@ provider:
     REDIS_PORT: ${env:REDIS_PORT, '6379'}
     SWAPI_BASE_URL: ${env:SWAPI_BASE_URL, 'https://swapi.dev/api'}
     POKEAPI_BASE_URL: ${env:POKEAPI_BASE_URL, 'https://pokeapi.co/api/v2'}
-    COGNITO_USER_POOL_ID: ${env:COGNITO_USER_POOL_ID}
+    COGNITO_USER_POOL_ID: ${env:COGNITO_USER_POOL_ID, 'local-dev-pool'}
     AWS_REGION: ${self:provider.region}
     CACHE_TTL_MINUTES: ${env:CACHE_TTL_MINUTES, '30'}
     API_RATE_LIMIT_RPM: ${env:API_RATE_LIMIT_RPM, '60'}
@@ -40,7 +40,7 @@ provider:
           Action:
             - cognito-idp:GetUser
           Resource: 
-            - "arn:aws:cognito-idp:${self:provider.region}:*:userpool/${env:COGNITO_USER_POOL_ID}"
+            - "arn:aws:cognito-idp:${self:provider.region}:*:userpool/${env:COGNITO_USER_POOL_ID, 'local-dev-pool'}"
 
 plugins:
   - serverless-plugin-typescript

@@ -168,13 +168,21 @@ class Logger {
     severity: 'low' | 'medium' | 'high' | 'critical',
     context?: LogContext
   ): void {
-    const logMethod = severity === 'critical' || severity === 'high' ? 'error' : 'warn';
-    this[logMethod]('Security Event', {
-      ...context,
-      event,
-      severity,
-      type: 'security_event',
-    });
+    if (severity === 'critical' || severity === 'high') {
+      this.error('Security Event', undefined, {
+        ...context,
+        event,
+        severity,
+        type: 'security_event',
+      });
+    } else {
+      this.warn('Security Event', {
+        ...context,
+        event,
+        severity,
+        type: 'security_event',
+      });
+    }
   }
 
   public logBusinessEvent(

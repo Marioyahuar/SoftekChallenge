@@ -1,4 +1,4 @@
-import { logger } from './logger';
+import { logger } from "./logger";
 
 export interface MetricData {
   name: string;
@@ -40,7 +40,7 @@ export class MetricsCollector {
     // Log the metric for CloudWatch ingestion
     logger.logPerformanceMetric(name, value, unit, {
       dimensions: dimensions || {},
-      timestamp: metric.timestamp.toISOString(),
+      timestamp: (metric.timestamp ?? new Date()).toISOString(),
     });
 
     // In a real AWS environment, you would also send to CloudWatch directly
@@ -53,7 +53,7 @@ export class MetricsCollector {
     duration: number,
     statusCode: number
   ): void {
-    this.recordMetric('ResponseTime', duration, 'Milliseconds', {
+    this.recordMetric("ResponseTime", duration, "Milliseconds", {
       Endpoint: endpoint,
       Method: method,
       StatusCode: statusCode.toString(),
@@ -66,7 +66,7 @@ export class MetricsCollector {
     total: number
   ): void {
     const ratio = total > 0 ? (hits / total) * 100 : 0;
-    this.recordMetric('CacheHitRatio', ratio, 'Percent', {
+    this.recordMetric("CacheHitRatio", ratio, "Percent", {
       CacheType: cacheType,
     });
   }
@@ -76,12 +76,12 @@ export class MetricsCollector {
     success: boolean,
     duration: number
   ): void {
-    this.recordMetric('ExternalApiCallDuration', duration, 'Milliseconds', {
+    this.recordMetric("ExternalApiCallDuration", duration, "Milliseconds", {
       ApiName: apiName,
       Success: success.toString(),
     });
 
-    this.recordMetric('ExternalApiCallCount', 1, 'Count', {
+    this.recordMetric("ExternalApiCallCount", 1, "Count", {
       ApiName: apiName,
       Success: success.toString(),
     });
@@ -92,7 +92,7 @@ export class MetricsCollector {
     score: number,
     compatibilityLevel: string
   ): void {
-    this.recordMetric('FusionScore', score, 'None', {
+    this.recordMetric("FusionScore", score, "None", {
       Strategy: strategy,
       CompatibilityLevel: compatibilityLevel,
     });
@@ -103,7 +103,7 @@ export class MetricsCollector {
     errorCode: string,
     count: number
   ): void {
-    this.recordMetric('ErrorCount', count, 'Count', {
+    this.recordMetric("ErrorCount", count, "Count", {
       Endpoint: endpoint,
       ErrorCode: errorCode,
     });
@@ -115,18 +115,15 @@ export class MetricsCollector {
     duration: number,
     success: boolean
   ): void {
-    this.recordMetric('DatabaseOperationDuration', duration, 'Milliseconds', {
+    this.recordMetric("DatabaseOperationDuration", duration, "Milliseconds", {
       Operation: operation,
       Table: table,
       Success: success.toString(),
     });
   }
 
-  public recordRateLimitHit(
-    endpoint: string,
-    clientId: string
-  ): void {
-    this.recordMetric('RateLimitHits', 1, 'Count', {
+  public recordRateLimitHit(endpoint: string, clientId: string): void {
+    this.recordMetric("RateLimitHits", 1, "Count", {
       Endpoint: endpoint,
       ClientId: clientId,
     });
@@ -134,11 +131,27 @@ export class MetricsCollector {
 
   public recordMemoryUsage(): void {
     const memoryUsage = process.memoryUsage();
-    
-    this.recordMetric('MemoryUsage_RSS', memoryUsage.rss / 1024 / 1024, 'Megabytes');
-    this.recordMetric('MemoryUsage_HeapUsed', memoryUsage.heapUsed / 1024 / 1024, 'Megabytes');
-    this.recordMetric('MemoryUsage_HeapTotal', memoryUsage.heapTotal / 1024 / 1024, 'Megabytes');
-    this.recordMetric('MemoryUsage_External', memoryUsage.external / 1024 / 1024, 'Megabytes');
+
+    this.recordMetric(
+      "MemoryUsage_RSS",
+      memoryUsage.rss / 1024 / 1024,
+      "Megabytes"
+    );
+    this.recordMetric(
+      "MemoryUsage_HeapUsed",
+      memoryUsage.heapUsed / 1024 / 1024,
+      "Megabytes"
+    );
+    this.recordMetric(
+      "MemoryUsage_HeapTotal",
+      memoryUsage.heapTotal / 1024 / 1024,
+      "Megabytes"
+    );
+    this.recordMetric(
+      "MemoryUsage_External",
+      memoryUsage.external / 1024 / 1024,
+      "Megabytes"
+    );
   }
 
   public getMetrics(): MetricData[] {
@@ -153,14 +166,16 @@ export class MetricsCollector {
     // In a real AWS environment, you would use AWS SDK to send metrics
     // For now, we'll just log them in a format that CloudWatch can parse
     if (process.env.AWS_LAMBDA_FUNCTION_NAME) {
-      console.log(JSON.stringify({
-        MetricName: metric.name,
-        Value: metric.value,
-        Unit: metric.unit,
-        Dimensions: metric.dimensions,
-        Timestamp: metric.timestamp?.toISOString(),
-        Namespace: 'StarWarsPokemonAPI',
-      }));
+      console.log(
+        JSON.stringify({
+          MetricName: metric.name,
+          Value: metric.value,
+          Unit: metric.unit,
+          Dimensions: metric.dimensions,
+          Timestamp: metric.timestamp?.toISOString(),
+          Namespace: "StarWarsPokemonAPI",
+        })
+      );
     }
   }
 }

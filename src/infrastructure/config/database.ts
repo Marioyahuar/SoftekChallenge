@@ -1,5 +1,5 @@
-import mysql from 'mysql2/promise';
-import { environment } from './environment';
+import mysql from "mysql2/promise";
+import { environment } from "./environment";
 
 export class DatabaseConfig {
   private static connection: mysql.Connection;
@@ -12,10 +12,7 @@ export class DatabaseConfig {
         password: environment.database.password,
         database: environment.database.name,
         port: environment.database.port,
-        ssl: false,
         connectTimeout: 60000,
-        acquireTimeout: 60000,
-        timeout: 60000,
       });
     }
     return this.connection;
@@ -33,7 +30,7 @@ export class DatabaseConfig {
       await connection.ping();
       return true;
     } catch (error) {
-      console.error('Database connection failed:', error);
+      console.error("Database connection failed:", error);
       return false;
     }
   }

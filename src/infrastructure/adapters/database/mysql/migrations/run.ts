@@ -1,3 +1,6 @@
+import { config } from 'dotenv';
+config();
+
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { MySQLConnection } from '../connection';

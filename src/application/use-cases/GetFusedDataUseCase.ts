@@ -9,6 +9,7 @@ import { PokemonMatchingService } from '../services/PokemonMatchingService';
 import { HybridCacheService } from '../services/HybridCacheService';
 import { IFusedDataRepository } from '../ports/repositories/IFusedDataRepository';
 import { ICharacterTraitsRepository } from '../ports/repositories/ICharacterTraitsRepository';
+import { ISwapiCharacterRepository } from '../../infrastructure/adapters/database/mysql/repositories/SwapiCharacterRepository';
 
 export interface GetFusedDataRequest {
   character?: number;
@@ -26,7 +27,8 @@ export class GetFusedDataUseCase {
     private pokemonMatchingService: PokemonMatchingService,
     private cacheService: HybridCacheService,
     private fusedDataRepository: IFusedDataRepository,
-    private characterTraitsRepository: ICharacterTraitsRepository
+    private characterTraitsRepository: ICharacterTraitsRepository,
+    private swapiCharacterRepository: ISwapiCharacterRepository
   ) {}
 
   public async execute(request: GetFusedDataRequest): Promise<FusedCharacter[]> {
@@ -51,6 +53,13 @@ export class GetFusedDataUseCase {
       const characterId = i === 0 ? character : await this.getRandomCharacterId(true);
       const fusionStrategy = FusionStrategy.create(strategy);
 
+      console.log('DEBUG Cache Check:', {
+        characterId,
+        strategy,
+        theme,
+        cacheKey: `fusion:character:${characterId}:${strategy}${theme ? ':' + theme : ''}`
+      });
+
       const cachedResult = await this.cacheService.getFusionResult(
         characterId,
         strategy,
@@ -58,13 +67,23 @@ export class GetFusedDataUseCase {
       );
 
       if (cachedResult) {
+        console.log('DEBUG Cache HIT:', {
+          characterId,
+          cachedCharacterId: cachedResult.starWarsCharacter?.id,
+          cachedCharacterName: cachedResult.starWarsCharacter?.name
+        });
         cacheHit = true;
         results.push(cachedResult);
         continue;
       }
 
-      const swCharacter = await this.swapiService.getCharacter(characterId);
-      apiCallsMade++;
+      console.log('DEBUG Cache MISS:', { characterId, strategy, theme });
+
+      const { character: swCharacter, apiCallsCount } = await this.swapiService.getCharacter(characterId);
+      apiCallsMade += apiCallsCount;
+
+      // Save the character to the database first (required for FK constraint)
+      await this.swapiCharacterRepository.save(swCharacter);
 
       let traits = await this.characterTraitsRepository.findByCharacterId(characterId);
       
@@ -102,6 +121,14 @@ export class GetFusedDataUseCase {
       });
 
       await this.fusedDataRepository.save(fusedCharacter);
+
+      console.log('DEBUG Cache STORE:', {
+        characterId,
+        strategy,
+        theme,
+        storedCharacterId: fusedCharacter.starWarsCharacter?.id,
+        storedCharacterName: fusedCharacter.starWarsCharacter?.name
+      });
 
       await this.cacheService.storeFusionResult(
         characterId,

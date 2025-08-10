@@ -33,6 +33,26 @@ export class AuthMiddleware {
     const token = authHeader.substring(7);
 
     try {
+      // En desarrollo, permitir tokens especiales
+      if (environment.app.nodeEnv === 'development' || environment.aws.cognitoUserPoolId === 'local-dev-pool') {
+        if (token === 'admin') {
+          return {
+            userId: 'admin',
+            email: 'admin@example.com',
+            sub: 'admin',
+            username: 'admin',
+          };
+        }
+        if (token === 'cualquier-token' || token.startsWith('dev-')) {
+          return {
+            userId: 'dev-user-123',
+            email: 'dev@example.com',
+            sub: 'dev-user-123',
+            username: 'dev-user',
+          };
+        }
+      }
+
       const decodedToken = jwt.decode(token, { complete: true }) as any;
 
       if (!decodedToken) {
@@ -54,6 +74,16 @@ export class AuthMiddleware {
   }
 
   private async validateCognitoToken(accessToken: string): Promise<any> {
+    // Development mode - skip real Cognito validation
+    if (environment.app.nodeEnv === 'development' || environment.aws.cognitoUserPoolId === 'local-dev-pool') {
+      console.log('Development mode: bypassing Cognito validation');
+      return {
+        sub: 'dev-user-123',
+        username: 'dev-user',
+        email: 'dev@example.com',
+      };
+    }
+
     try {
       const command = new GetUserCommand({
         AccessToken: accessToken,

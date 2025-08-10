@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mysql:
     image: mysql:8.0
@@ -38,7 +36,10 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     container_name: starwars-pokemon-app
+    env_file:
+      - .env.docker
     environment:
+      # These override .env.docker for container networking
       DB_HOST: mysql
       DB_NAME: starwars_pokemon_db
       DB_USER: api_user
@@ -57,7 +58,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: npm run dev
+    command: npx serverless offline --config serverless.local.yml
 
 volumes:
   mysql_data:
