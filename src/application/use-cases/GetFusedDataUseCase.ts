@@ -35,6 +35,7 @@ export class GetFusedDataUseCase {
     const startTime = Date.now();
     let apiCallsMade = 0;
     let cacheHit = false;
+    let anyCacheHit = false;
 
     const {
       character = await this.getRandomCharacterId(request.random),
@@ -52,6 +53,7 @@ export class GetFusedDataUseCase {
     for (let i = 0; i < limit; i++) {
       const characterId = i === 0 ? character : await this.getRandomCharacterId(true);
       const fusionStrategy = FusionStrategy.create(strategy);
+      cacheHit = false; // Reset for each iteration
 
       console.log('DEBUG Cache Check:', {
         characterId,
@@ -73,6 +75,7 @@ export class GetFusedDataUseCase {
           cachedCharacterName: cachedResult.starWarsCharacter?.name
         });
         cacheHit = true;
+        anyCacheHit = true;
         results.push(cachedResult);
         continue;
       }
@@ -114,7 +117,7 @@ export class GetFusedDataUseCase {
         fusionReason: pokemonMatch.fusionReason,
         matchingTraits: pokemonMatch.matchingTraits,
         metadata: {
-          cacheHit: i === 0 ? cacheHit : false,
+          cacheHit: i === 0 ? anyCacheHit : false,
           apiCallsMade,
           processingTimeMs: processingTime,
         },
