@@ -1,6 +1,7 @@
 # AWS Infrastructure Setup Guide
 
 ## Prerequisites
+
 - AWS CLI configured with appropriate permissions
 - Serverless Framework installed globally
 - Node.js 20+ installed
@@ -8,6 +9,7 @@
 ## 1. AWS Cognito User Pool Setup
 
 ### Create User Pool
+
 ```bash
 aws cognito-idp create-user-pool \
   --pool-name "StarWarsPokemonAPI-UserPool" \
@@ -18,6 +20,7 @@ aws cognito-idp create-user-pool \
 ```
 
 ### Create User Pool Client
+
 ```bash
 aws cognito-idp create-user-pool-client \
   --user-pool-id <USER_POOL_ID> \
@@ -30,6 +33,7 @@ aws cognito-idp create-user-pool-client \
 ```
 
 ### Test User Creation
+
 ```bash
 aws cognito-idp admin-create-user \
   --user-pool-id <USER_POOL_ID> \
@@ -42,6 +46,7 @@ aws cognito-idp admin-create-user \
 ## 2. RDS MySQL Database Setup
 
 ### Create DB Subnet Group
+
 ```bash
 aws rds create-db-subnet-group \
   --db-subnet-group-name starwars-pokemon-subnet-group \
@@ -51,6 +56,7 @@ aws rds create-db-subnet-group \
 ```
 
 ### Create RDS Instance
+
 ```bash
 aws rds create-db-instance \
   --db-instance-identifier starwars-pokemon-db \
@@ -72,6 +78,7 @@ aws rds create-db-instance \
 ## 3. ElastiCache Redis Setup
 
 ### Create Cache Subnet Group
+
 ```bash
 aws elasticache create-cache-subnet-group \
   --cache-subnet-group-name starwars-pokemon-cache-subnet \
@@ -81,6 +88,7 @@ aws elasticache create-cache-subnet-group \
 ```
 
 ### Create Redis Cluster
+
 ```bash
 aws elasticache create-cache-cluster \
   --cache-cluster-id starwars-pokemon-cache \
@@ -113,7 +121,7 @@ COGNITO_USER_POOL_ID=us-east-1_xxxxxxxxx
 AWS_REGION=us-east-1
 
 # External APIs
-SWAPI_BASE_URL=https://swapi.dev/api
+SWAPI_BASE_URL=https://swapi.info/api/
 POKEAPI_BASE_URL=https://pokeapi.co/api/v2
 
 # Application
@@ -125,11 +133,13 @@ LOG_LEVEL=info
 ## 5. Database Migration and Seeding
 
 ### Run Migrations
+
 ```bash
 npm run migration:run
 ```
 
 ### Run Seeds
+
 ```bash
 npm run seed:run
 ```
@@ -137,11 +147,13 @@ npm run seed:run
 ## 6. Deployment
 
 ### Deploy to AWS
+
 ```bash
 serverless deploy --stage prod
 ```
 
 ### Deploy to Development
+
 ```bash
 serverless deploy --stage dev
 ```
@@ -149,14 +161,17 @@ serverless deploy --stage dev
 ## 7. Security Group Configuration
 
 ### Lambda Security Group (Outbound)
+
 - Port 443 (HTTPS) to 0.0.0.0/0 for external API calls
 - Port 3306 (MySQL) to RDS security group
 - Port 6379 (Redis) to ElastiCache security group
 
 ### RDS Security Group (Inbound)
+
 - Port 3306 (MySQL) from Lambda security group
 
 ### ElastiCache Security Group (Inbound)
+
 - Port 6379 (Redis) from Lambda security group
 
 ## 8. IAM Roles and Policies
@@ -171,6 +186,7 @@ The Serverless Framework will automatically create the necessary IAM roles. Addi
 ## 9. Monitoring Setup
 
 ### CloudWatch Alarms
+
 ```bash
 # Lambda error rate alarm
 aws cloudwatch put-metric-alarm \
@@ -190,11 +206,13 @@ aws cloudwatch put-metric-alarm \
 ## 10. API Testing
 
 ### Test Fusion Endpoint
+
 ```bash
 curl -X GET "https://your-api-gateway-url/fusionados?character=1&strategy=intelligent"
 ```
 
 ### Test Custom Data (Requires Authentication)
+
 ```bash
 curl -X POST "https://your-api-gateway-url/almacenar" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
@@ -203,6 +221,7 @@ curl -X POST "https://your-api-gateway-url/almacenar" \
 ```
 
 ### Test History (Requires Authentication)
+
 ```bash
 curl -X GET "https://your-api-gateway-url/historial" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
@@ -211,16 +230,19 @@ curl -X GET "https://your-api-gateway-url/historial" \
 ## 11. Cost Optimization
 
 ### Lambda Optimization
+
 - Use provisioned concurrency for consistent performance
 - Set appropriate memory allocation (512MB recommended)
 - Set timeout to 30 seconds max
 
 ### Database Optimization
+
 - Use db.t3.micro for development
 - Enable Multi-AZ for production
 - Set appropriate backup retention
 
 ### Cache Optimization
+
 - Use cache.t3.micro for development
 - Monitor cache hit rates
 - Set appropriate TTL values

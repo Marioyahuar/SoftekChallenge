@@ -1,5 +1,6 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { RedisCacheAdapter } from "../../cache/RedisCacheAdapter";
+import { MemoryCacheAdapter } from "../../cache/MemoryCacheAdapter";
 import { environment } from "../../../config/environment";
 
 interface RateLimitConfig {
@@ -14,14 +15,20 @@ interface RateLimitInfo {
 
 export class RateLimitMiddleware {
   private cache: RedisCacheAdapter;
+  private memoryCache: MemoryCacheAdapter;
   private defaultConfig: RateLimitConfig;
+  private redisEnabled: boolean;
 
   constructor() {
     this.cache = new RedisCacheAdapter();
+    this.memoryCache = new MemoryCacheAdapter();
+    // Redis temporarily disabled - falling back to memory cache for rate limiting
+    this.redisEnabled = false;
     this.defaultConfig = {
       windowMinutes: 1,
       maxRequests: environment.app.apiRateLimitRpm,
     };
+    console.log('RateLimitMiddleware initialized with Redis temporarily disabled - using memory-based rate limiting');
   }
 
   public async checkRateLimit(
@@ -41,7 +48,9 @@ export class RateLimitMiddleware {
     const windowEnd = windowStart + finalConfig.windowMinutes * 60 * 1000;
 
     try {
-      const existingInfo = await this.cache.get<RateLimitInfo>(windowKey);
+      // Use memory cache instead of Redis when Redis is disabled
+      const cacheToUse = this.redisEnabled ? this.cache : this.memoryCache;
+      const existingInfo = await cacheToUse.get<RateLimitInfo>(windowKey);
 
       if (!existingInfo || existingInfo.resetTime <= windowStart) {
         const newInfo: RateLimitInfo = {
@@ -49,7 +58,7 @@ export class RateLimitMiddleware {
           resetTime: windowEnd,
         };
 
-        await this.cache.set(
+        await cacheToUse.set(
           windowKey,
           newInfo,
           finalConfig.windowMinutes * 60
@@ -77,7 +86,7 @@ export class RateLimitMiddleware {
         resetTime: existingInfo.resetTime,
       };
 
-      await this.cache.set(
+      await cacheToUse.set(
         windowKey,
         updatedInfo,
         Math.ceil((existingInfo.resetTime - windowStart) / 1000)
@@ -90,8 +99,9 @@ export class RateLimitMiddleware {
         resetTime: existingInfo.resetTime,
       };
     } catch (error) {
-      console.error("Rate limiting check failed:", error);
+      console.error("Rate limiting check failed (Redis disabled, fallback allowed):", error);
 
+      // When Redis is disabled, always allow requests but log the attempt
       return {
         allowed: true,
         limit: finalConfig.maxRequests,

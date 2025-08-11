@@ -6,6 +6,16 @@ export class DatabaseConfig {
 
   public static async getConnection(): Promise<mysql.Connection> {
     if (!this.connection) {
+      // Temporary debug logs
+      console.log('DB Config Debug:', {
+        host: environment.database.host,
+        user: environment.database.user,
+        password: environment.database.password ? '***SET***' : '***EMPTY***',
+        passwordLength: environment.database.password?.length,
+        database: environment.database.name,
+        port: environment.database.port,
+      });
+      
       this.connection = await mysql.createConnection({
         host: environment.database.host,
         user: environment.database.user,

@@ -116,20 +116,31 @@ src/
 ## Especificaciones de Endpoints
 
 ### 1. GET /fusionados
+
 **Funcionalidad**: Fusiona personajes de Star Wars con Pokémon usando algoritmo inteligente.
 
 **Parámetros**:
+
 ```typescript
 interface FusionParams {
-  character?: number;          // ID de SWAPI (1-82)
-  strategy?: 'intelligent' | 'random' | 'theme';
-  theme?: 'desert' | 'ocean' | 'forest' | 'ice' | 'urban' | 'mechanical' | 'heroic' | 'dark_side';
-  limit?: number;              // 1-10, default: 1
+  character?: number; // ID de SWAPI (1-82)
+  strategy?: "intelligent" | "random" | "theme";
+  theme?:
+    | "desert"
+    | "ocean"
+    | "forest"
+    | "ice"
+    | "urban"
+    | "mechanical"
+    | "heroic"
+    | "dark_side";
+  limit?: number; // 1-10, default: 1
   random?: boolean;
 }
 ```
 
 **Response**:
+
 ```typescript
 interface FusionResponse {
   id: string;
@@ -156,15 +167,15 @@ interface FusionResponse {
     pokemonCompanion: {
       id: number;
       name: string;
-      types: Array<{name: string}>;
-      stats: Array<{base_stat: number, stat: {name: string}}>;
-      sprites: {front_default: string};
+      types: Array<{ name: string }>;
+      stats: Array<{ base_stat: number; stat: { name: string } }>;
+      sprites: { front_default: string };
     };
     fusionAnalysis: {
-      fusionScore: number;        // 0.0-1.0
+      fusionScore: number; // 0.0-1.0
       fusionReason: string;
       matchingTraits: string[];
-      compatibilityLevel: 'low' | 'medium' | 'high' | 'perfect';
+      compatibilityLevel: "low" | "medium" | "high" | "perfect";
     };
   };
   metadata: {
@@ -176,9 +187,11 @@ interface FusionResponse {
 ```
 
 ### 2. POST /almacenar
+
 **Funcionalidad**: Almacena datos personalizados del usuario.
 
 **Request Body**:
+
 ```typescript
 interface CustomDataRequest {
   name: string;
@@ -192,9 +205,11 @@ interface CustomDataRequest {
 **Requiere**: Autenticación JWT
 
 ### 3. GET /historial
+
 **Funcionalidad**: Retorna historial paginado de fusiones almacenadas.
 
 **Query Parameters**:
+
 - `page`: número (default: 1)
 - `limit`: número (default: 10, max: 100)
 - `sortBy`: 'timestamp' | 'fusionScore' | 'strategy'
@@ -314,6 +329,7 @@ CREATE TABLE custom_data (
 ### Datos Semilla para Mapeos
 
 Implementar seeder que inserte mapeos básicos como:
+
 - `desert` → Pokémon IDs [27, 28, 104] (Sandshrew, Sandslash, Cubone)
 - `ocean` → Pokémon IDs [7, 8, 9] (Squirtle line)
 - `heroic` → Pokémon IDs [25, 6, 150] (Pikachu, Charizard, Mewtwo)
@@ -326,18 +342,21 @@ Implementar seeder que inserte mapeos básicos como:
 **TraitExtractionService** debe implementar:
 
 1. **Environment Traits**: Analizar `planet.climate` y `planet.terrain`
+
    - "desert", "arid" → `desert`
    - "ocean", "aquatic" → `ocean`
    - "frozen", "ice" → `ice`
    - "forest", "jungle" → `forest`
 
 2. **Physical Traits**: Analizar `character.height`, `character.mass`, `character.species`
+
    - height < 150 → `small`
    - height > 200 → `tall`
    - species "Droid" → `mechanical`
    - species "Human" → `human`
 
 3. **Personality Traits**: Análisis basado en `character.name`
+
    - Nombres como "Luke", "Leia", "Han" → `heroic`
    - Nombres como "Vader", "Palpatine" → `dark_side`
    - Nombres como "Yoda", "Obi-Wan" → `wise`
@@ -352,16 +371,19 @@ Implementar seeder que inserte mapeos básicos como:
 **PokemonMatchingService** debe implementar:
 
 1. **Scoring System**: Para cada trait del personaje:
+
    - Buscar mappings en `trait_pokemon_mappings`
    - Sumar scores ponderados por `weight`
    - Aplicar bonus por múltiples matches
 
 2. **Strategy Implementation**:
+
    - `intelligent`: Usar scoring completo
    - `random`: Selección aleatoria
    - `theme`: Filtrar por tema específico
 
 3. **Fallback Logic**: Si no hay matches perfectos:
+
    - Usar mappings genéricos (human → Pikachu)
    - Lista curada de Pokémon populares
 
@@ -372,11 +394,13 @@ Implementar seeder que inserte mapeos básicos como:
 ### Arquitectura Multi-Nivel
 
 1. **Nivel 1 - Redis Cache Principal**:
+
    - Key pattern: `fusion:character:{id}:{strategy}`
    - TTL: 30 minutos
    - Almacena respuestas completas
 
 2. **Nivel 2 - Component Cache**:
+
    - Character traits: `character:traits:{id}` (24h TTL)
    - Pokemon data: `pokemon:data:{id}` (7d TTL)
    - Trait mappings: `mappings:all` (1h TTL)
@@ -400,6 +424,7 @@ Implementar seeder que inserte mapeos básicos como:
 ### Cache Warming
 
 Implementar pre-carga de:
+
 - Personajes populares (IDs 1-10)
 - Pokémon populares (1, 6, 9, 25, 94, 150)
 - Trait mappings completos
@@ -449,7 +474,7 @@ functions:
       - httpApi:
           path: /fusionados
           method: get
-          
+
   customData:
     handler: src/infrastructure/adapters/http/handlers/customDataHandler.handler
     events:
@@ -458,7 +483,7 @@ functions:
           method: post
           authorizer:
             type: jwt
-            
+
   history:
     handler: src/infrastructure/adapters/http/handlers/historyHandler.handler
     events:
@@ -475,7 +500,7 @@ resources:
       Properties:
         DBInstanceClass: db.t3.micro
         Engine: mysql
-        
+
     RedisCluster:
       Type: AWS::ElastiCache::CacheCluster
       Properties:
@@ -486,16 +511,19 @@ resources:
 ## Autenticación y Seguridad
 
 ### AWS Cognito Setup
+
 - User Pool para gestión de usuarios
 - JWT tokens para autenticación stateless
 - Proteger endpoints POST /almacenar y GET /historial
 
 ### Rate Limiting
+
 - `/fusionados`: 60 requests/minute
-- `/almacenar`: 30 requests/minute  
+- `/almacenar`: 30 requests/minute
 - `/historial`: 100 requests/minute
 
 ### Input Validation
+
 - Joi schemas para validación de requests
 - Sanitización de inputs
 - Error handling consistente
@@ -503,6 +531,7 @@ resources:
 ## Testing Strategy
 
 ### Unit Tests
+
 - Casos de uso con mocks
 - Algoritmos de extracción de traits
 - Lógica de matching de Pokémon
@@ -510,17 +539,20 @@ resources:
 - Coverage target: >80%
 
 ### Integration Tests
+
 - Flow completo de fusión
 - Operaciones de base de datos
 - Cache multi-nivel
 - External API integrations
 
 ### E2E Tests
+
 - Endpoints completos con autenticación
 - Performance benchmarks
 - Error scenarios
 
 ### BDD Tests (Gherkin)
+
 ```gherkin
 Feature: Intelligent Fusion
   Scenario: Desert character gets ground-type Pokemon
@@ -533,18 +565,21 @@ Feature: Intelligent Fusion
 ## Monitoreo y Observabilidad
 
 ### CloudWatch Metrics
+
 - Response times por endpoint
 - Cache hit ratios
 - Error rates 4xx/5xx
 - External API call counts
 
 ### X-Ray Tracing
+
 - Request tracing end-to-end
 - Performance bottlenecks
 - External API latencies
 - Cache operation timing
 
 ### Structured Logging
+
 - Request/response logging
 - Error tracking con contexto
 - Performance metrics
@@ -563,7 +598,7 @@ DB_PASSWORD=secure_password
 REDIS_HOST=elasticache-endpoint
 
 # External APIs
-SWAPI_BASE_URL=https://swapi.dev/api
+SWAPI_BASE_URL=https://swapi.info/api/
 POKEAPI_BASE_URL=https://pokeapi.co/api/v2
 
 # AWS
@@ -579,12 +614,14 @@ LOG_LEVEL=info
 ## Criterios de Éxito
 
 ### Performance KPIs
+
 - Response time < 2s para fusiones (cache miss)
 - Response time < 200ms para cache hits
 - Cache hit ratio > 80%
 - Uptime > 99.5%
 
 ### Functional Requirements
+
 - ✅ 3 endpoints funcionando
 - ✅ Fusión inteligente basada en traits
 - ✅ Cache 30 minutos
@@ -593,6 +630,7 @@ LOG_LEVEL=info
 - ✅ Documentación Swagger
 
 ### Bonus Features
+
 - ✅ Rate limiting
 - ✅ Monitoreo X-Ray
 - ✅ BDD tests
