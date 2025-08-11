@@ -1,34 +1,41 @@
 import { ICacheService } from '../../../application/ports/services/ICacheService';
-import { RedisCacheAdapter } from './RedisCacheAdapter';
+import { DynamoDBCacheAdapter } from './DynamoDBCacheAdapter';
 import { MemoryCacheAdapter } from './MemoryCacheAdapter';
 
 export class HybridCacheAdapter implements ICacheService {
-  private redisCache: RedisCacheAdapter;
+  private dynamoCache: DynamoDBCacheAdapter;
   private memoryCache: MemoryCacheAdapter;
-  private redisEnabled: boolean;
+  private dynamoEnabled: boolean;
 
   constructor() {
-    this.redisCache = new RedisCacheAdapter();
+    this.dynamoCache = new DynamoDBCacheAdapter();
     this.memoryCache = new MemoryCacheAdapter();
-    // Redis is temporarily disabled - using only memory cache
-    this.redisEnabled = false;
-    console.log('HybridCacheAdapter initialized with Redis temporarily disabled - falling back to memory-only caching');
+    // DynamoDB cache enabled for production
+    this.dynamoEnabled = true;
+    console.log('HybridCacheAdapter initialized with DynamoDB cache enabled');
   }
 
   public async get<T>(key: string): Promise<T | null> {
+    // First check memory cache (fastest)
     let value = await this.memoryCache.get<T>(key);
     
     if (value) {
       return value;
     }
 
-    // Redis temporarily disabled - skip Redis lookup
-    if (this.redisEnabled) {
-      value = await this.redisCache.get<T>(key);
+    // Then check DynamoDB cache
+    if (this.dynamoEnabled) {
+      const cachedString = await this.dynamoCache.get(key);
       
-      if (value) {
-        await this.memoryCache.set(key, value, 300);
-        return value;
+      if (cachedString) {
+        try {
+          value = JSON.parse(cachedString) as T;
+          // Store in memory for faster access
+          await this.memoryCache.set(key, value, 300);
+          return value;
+        } catch (error) {
+          console.error('Error parsing cached value:', error);
+        }
       }
     }
 
@@ -36,14 +43,15 @@ export class HybridCacheAdapter implements ICacheService {
   }
 
   public async set<T>(key: string, value: T, ttlSeconds = 1800): Promise<void> {
-    // Always set in memory cache
+    // Always set in memory cache (fast access)
     const memoryPromise = this.memoryCache.set(key, value, Math.min(ttlSeconds, 300));
     
-    // Redis temporarily disabled - only use memory cache
-    if (this.redisEnabled) {
+    // Also set in DynamoDB cache (persistent)
+    if (this.dynamoEnabled) {
+      const ttlMinutes = Math.ceil(ttlSeconds / 60);
       await Promise.all([
         memoryPromise,
-        this.redisCache.set(key, value, ttlSeconds)
+        this.dynamoCache.set(key, JSON.stringify(value), ttlMinutes)
       ]);
     } else {
       await memoryPromise;

@@ -36,6 +36,11 @@ export const environment: EnvironmentConfig = {
     password: process.env.DB_PASSWORD || "",
     port: parseInt(process.env.DB_PORT || "3306"),
   },
+  // Cache configuration - using DynamoDB in production
+  cache: {
+    tableName: process.env.CACHE_TABLE_NAME || "star-wars-pokemon-api-dev-cache",
+    ttlMinutes: parseInt(process.env.CACHE_TTL_MINUTES || "30"),
+  },
   // Redis temporarily disabled - configuration kept for easy re-enabling
   redis: {
     host: process.env.REDIS_HOST || "localhost",
