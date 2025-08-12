@@ -3,6 +3,7 @@ import { apisConfig } from "../../../config/apis";
 import { StarWarsCharacter } from "../../../../domain/entities/StarWarsCharacter";
 import { SwapiError } from "../../../../domain/errors/ExternalApiError";
 import { SwapiPerson, SwapiPlanet, SwapiSpecies } from "./types";
+import { XRayTracing } from "../../../../shared/utils/aws-monitoring";
 
 export class SwapiService {
   private httpClient: HttpClient;
@@ -27,8 +28,12 @@ export class SwapiService {
         fullURL: `${apisConfig.swapi.baseURL}${apisConfig.swapi.endpoints.people}/${id}/`
       });
 
-      const person = await this.httpClient.get<SwapiPerson>(
-        `${apisConfig.swapi.endpoints.people}/${id}/`
+      const person = await XRayTracing.traceExternalCall(
+        'SWAPI',
+        'getCharacter',
+        () => this.httpClient.get<SwapiPerson>(
+          `${apisConfig.swapi.endpoints.people}/${id}/`
+        )
       );
       apiCallsCount++; // 1st call: person
 

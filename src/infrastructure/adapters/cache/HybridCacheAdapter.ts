@@ -25,17 +25,12 @@ export class HybridCacheAdapter implements ICacheService {
 
     // Then check DynamoDB cache
     if (this.dynamoEnabled) {
-      const cachedString = await this.dynamoCache.get(key);
+      value = await this.dynamoCache.get<T>(key);
       
-      if (cachedString) {
-        try {
-          value = JSON.parse(cachedString) as T;
-          // Store in memory for faster access
-          await this.memoryCache.set(key, value, 300);
-          return value;
-        } catch (error) {
-          console.error('Error parsing cached value:', error);
-        }
+      if (value) {
+        // Store in memory for faster access
+        await this.memoryCache.set(key, value, 300);
+        return value;
       }
     }
 
@@ -62,11 +57,11 @@ export class HybridCacheAdapter implements ICacheService {
     // Always delete from memory cache
     const memoryPromise = this.memoryCache.delete(key);
     
-    // Redis temporarily disabled - only delete from memory cache
-    if (this.redisEnabled) {
+    // Delete from both memory and DynamoDB cache
+    if (this.dynamoEnabled) {
       await Promise.all([
         memoryPromise,
-        this.redisCache.delete(key)
+        this.dynamoCache.delete(key)
       ]);
     } else {
       await memoryPromise;
@@ -79,9 +74,9 @@ export class HybridCacheAdapter implements ICacheService {
       return true;
     }
 
-    // Redis temporarily disabled - only check memory cache
-    if (this.redisEnabled) {
-      return await this.redisCache.exists(key);
+    // Check DynamoDB cache if enabled
+    if (this.dynamoEnabled) {
+      return await this.dynamoCache.exists(key);
     }
     
     return false;
@@ -91,11 +86,11 @@ export class HybridCacheAdapter implements ICacheService {
     // Always clear memory cache
     const memoryPromise = this.memoryCache.clear();
     
-    // Redis temporarily disabled - only clear memory cache
-    if (this.redisEnabled) {
+    // Clear both memory and DynamoDB cache
+    if (this.dynamoEnabled) {
       await Promise.all([
         memoryPromise,
-        this.redisCache.clear()
+        this.dynamoCache.clear()
       ]);
     } else {
       await memoryPromise;

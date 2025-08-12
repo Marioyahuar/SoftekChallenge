@@ -1,8 +1,8 @@
 import { DynamoDBClient, GetItemCommand, PutItemCommand } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
-import { ICacheAdapter } from '../../../domain/ports/ICacheAdapter';
+import { ICacheService } from '../../../application/ports/services/ICacheService';
 
-export class DynamoDBCacheAdapter implements ICacheAdapter {
+export class DynamoDBCacheAdapter implements ICacheService {
   private client: DynamoDBClient;
   private tableName: string;
 
@@ -11,7 +11,7 @@ export class DynamoDBCacheAdapter implements ICacheAdapter {
     this.tableName = process.env.CACHE_TABLE_NAME || 'star-wars-pokemon-api-dev-cache';
   }
 
-  async get(key: string): Promise<string | null> {
+  async get<T>(key: string): Promise<T | null> {
     try {
       const command = new GetItemCommand({
         TableName: this.tableName,
@@ -31,24 +31,35 @@ export class DynamoDBCacheAdapter implements ICacheAdapter {
         return null;
       }
 
-      return item.value || null;
+      // Check if value is already an object or string
+      if (typeof item.value === 'string') {
+        try {
+          return JSON.parse(item.value) as T;
+        } catch (parseError) {
+          console.error('Error parsing cached JSON string:', parseError);
+          return null;
+        }
+      } else {
+        // Value is already an object
+        return item.value as T;
+      }
     } catch (error) {
       console.error('DynamoDB Cache Get Error:', error);
       return null; // Fail gracefully, don't break the app
     }
   }
 
-  async set(key: string, value: string, ttlMinutes?: number): Promise<void> {
+  async set<T>(key: string, value: T, ttlSeconds?: number): Promise<void> {
     try {
-      const ttl = ttlMinutes 
-        ? Math.floor(Date.now() / 1000) + (ttlMinutes * 60)
+      const ttl = ttlSeconds 
+        ? Math.floor(Date.now() / 1000) + ttlSeconds
         : Math.floor(Date.now() / 1000) + (30 * 60); // Default 30 minutes
 
       const command = new PutItemCommand({
         TableName: this.tableName,
         Item: marshall({
           cacheKey: key,
-          value: value,
+          value: JSON.stringify(value),
           ttl: ttl,
           createdAt: new Date().toISOString()
         }),
@@ -67,6 +78,26 @@ export class DynamoDBCacheAdapter implements ICacheAdapter {
       // We could implement explicit deletion if needed
     } catch (error) {
       console.error('DynamoDB Cache Delete Error:', error);
+    }
+  }
+
+  async exists(key: string): Promise<boolean> {
+    try {
+      const result = await this.get(key);
+      return result !== null;
+    } catch (error) {
+      console.error('DynamoDB Cache Exists Error:', error);
+      return false;
+    }
+  }
+
+  async clear(): Promise<void> {
+    try {
+      // DynamoDB doesn't have a clear all operation
+      // In practice, we'd scan and delete, but for cache it's not usually needed
+      console.log('DynamoDB Cache Clear: Not implemented (TTL handles expiration)');
+    } catch (error) {
+      console.error('DynamoDB Cache Clear Error:', error);
     }
   }
 

@@ -40,6 +40,10 @@ provider:
           Resource: "*"
         - Effect: Allow
           Action:
+            - cloudwatch:PutMetricData
+          Resource: "*"
+        - Effect: Allow
+          Action:
             - cognito-idp:GetUser
           Resource:
             - "arn:aws:cognito-idp:us-east-2:*:userpool/us-east-2_WMoVpxe1F"

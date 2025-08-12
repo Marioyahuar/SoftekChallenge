@@ -15,10 +15,9 @@ import {
   validateQueryParams,
   fusedDataQuerySchema,
 } from "../schemas/validation-schemas";
+import { XRayTracing, CloudWatchMetrics, withXRayTracing } from "../../../../shared/utils/aws-monitoring";
 
-export const handler = withErrorHandling(
-  withRateLimit(
-    async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+const fusedDataHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
       const startTime = Date.now();
 
       // Handle serverless-offline differences  
@@ -95,12 +94,39 @@ export const handler = withErrorHandling(
         swapiCharacterRepository
       );
 
-      const fusedCharacters = await getFusedDataUseCase.execute(queryParams);
+      // Execute with X-Ray tracing
+      const fusedCharacters = await XRayTracing.traceExternalCall(
+        'FusionProcess',
+        'getFusedData',
+        () => getFusedDataUseCase.execute(queryParams)
+      );
 
       const processingTime = Date.now() - startTime;
 
+      // Send CloudWatch metrics
+      if (fusedCharacters.length > 0) {
+        const firstFusion = fusedCharacters[0];
+        if (firstFusion && firstFusion.metadata) {
+          await CloudWatchMetrics.recordFusionMetrics(
+            firstFusion.fusionStrategy.toString(),
+            firstFusion.metadata.cacheHit,
+            processingTime
+          );
+        }
+        
+        await CloudWatchMetrics.recordResponseTime(
+          '/fusionados',
+          'GET',
+          processingTime,
+          200
+        );
+      }
+
       const response =
         fusedCharacters.length === 1 ? fusedCharacters[0] : fusedCharacters;
+
+      // Ensure response is properly serialized
+      const bodyString = typeof response === 'string' ? response : JSON.stringify(response);
 
       return {
         statusCode: 200,
@@ -109,9 +135,13 @@ export const handler = withErrorHandling(
           "Access-Control-Allow-Origin": "*",
           "X-Processing-Time": processingTime.toString(),
         },
-        body: JSON.stringify(response),
+        body: bodyString,
       };
-    },
+};
+
+export const handler = withErrorHandling(
+  withRateLimit(
+    withXRayTracing(fusedDataHandler, 'FusedDataHandler'),
     { maxRequests: 60, windowMinutes: 1 }
   )
 );

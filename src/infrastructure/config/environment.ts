@@ -6,6 +6,10 @@ export interface EnvironmentConfig {
     password: string;
     port: number;
   };
+  cache: {
+    tableName: string;
+    ttlMinutes: number;
+  };
   // Redis temporarily disabled - keeping configuration structure for easy re-enabling
   redis: {
     host: string;
