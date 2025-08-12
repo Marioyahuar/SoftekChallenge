@@ -130,3 +130,6 @@ logs
 # Test outputs
 test-results/
 *.lcov
+
+# Claude Code files
+.claude/

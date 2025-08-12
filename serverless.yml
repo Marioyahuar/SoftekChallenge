@@ -11,21 +11,21 @@ provider:
   memorySize: 512
   environment:
     STAGE: ${self:provider.stage}
-    DB_HOST: starwars-pokemon-db.cjiw6sowo02v.us-east-2.rds.amazonaws.com
-    DB_NAME: starwars_pokemon
-    DB_USER: admin
-    DB_PASSWORD: ServerlessDeploy1
-    DB_PORT: "3306"
-    REDIS_HOST: starwars-pokemon-redis.lt0ey8.ng.0001.use2.cache.amazonaws.com
-    REDIS_PORT: "6379"
+    DB_HOST: ${env:DB_HOST}
+    DB_NAME: ${env:DB_NAME}
+    DB_USER: ${env:DB_USER}
+    DB_PASSWORD: ${env:DB_PASSWORD}
+    DB_PORT: ${env:DB_PORT, "3306"}
+    REDIS_HOST: ${env:REDIS_HOST}
+    REDIS_PORT: ${env:REDIS_PORT, "6379"}
     SWAPI_BASE_URL: "https://swapi.info/api/"
     POKEAPI_BASE_URL: "https://pokeapi.co/api/v2"
-    COGNITO_USER_POOL_ID: us-east-2_WMoVpxe1F
+    COGNITO_USER_POOL_ID: ${env:COGNITO_USER_POOL_ID}
     CACHE_TTL_MINUTES: "30"
     API_RATE_LIMIT_RPM: "60"
     LOG_LEVEL: "debug"
-    ADMIN_USER_IDS: f19be580-9021-7005-c0d2-209049612fe2
-    COGNITO_CLIENT_ID: 14qjcibk8s5ma1lv94sciqjgu9
+    ADMIN_USER_IDS: ${env:ADMIN_USER_IDS}
+    COGNITO_CLIENT_ID: ${env:COGNITO_CLIENT_ID}
     CACHE_TABLE_NAME: ${self:service}-${self:provider.stage}-cache
   tracing:
     lambda: true
@@ -46,7 +46,7 @@ provider:
           Action:
             - cognito-idp:GetUser
           Resource:
-            - "arn:aws:cognito-idp:us-east-2:*:userpool/us-east-2_WMoVpxe1F"
+            - "arn:aws:cognito-idp:us-east-2:*:userpool/${env:COGNITO_USER_POOL_ID}"
         - Effect: Allow
           Action:
             - dynamodb:GetItem
@@ -60,9 +60,9 @@ provider:
       cognitoAuthorizer:
         type: jwt
         identitySource: $request.header.Authorization
-        issuerUrl: https://cognito-idp.us-east-2.amazonaws.com/us-east-2_WMoVpxe1F
+        issuerUrl: https://cognito-idp.us-east-2.amazonaws.com/${env:COGNITO_USER_POOL_ID}
         audience:
-          - 14qjcibk8s5ma1lv94sciqjgu9
+          - ${env:COGNITO_CLIENT_ID}
 
 plugins:
   - serverless-plugin-typescript
