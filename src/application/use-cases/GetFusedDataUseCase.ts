@@ -71,12 +71,32 @@ export class GetFusedDataUseCase {
       if (cachedResult) {
         console.log('DEBUG Cache HIT:', {
           characterId,
-          cachedCharacterId: cachedResult.starWarsCharacter?.id,
-          cachedCharacterName: cachedResult.starWarsCharacter?.name
+          cacheType: typeof cachedResult
         });
         cacheHit = true;
         anyCacheHit = true;
-        results.push(cachedResult);
+        
+        // Parse the cached result if it's a string
+        const parsedResult = typeof cachedResult === 'string' 
+          ? JSON.parse(cachedResult) 
+          : cachedResult;
+        
+        // Update metadata
+        parsedResult.metadata = {
+          cacheHit: true,
+          apiCallsMade: 0,
+          processingTimeMs: Date.now() - startTime
+        };
+        
+        // Log cache hit to CloudWatch
+        console.log('CACHE_HIT_METRIC', {
+          characterId,
+          strategy,
+          theme: theme || 'none',
+          timestamp: new Date().toISOString()
+        });
+        
+        results.push(parsedResult);
         continue;
       }
 
@@ -121,6 +141,7 @@ export class GetFusedDataUseCase {
           apiCallsMade,
           processingTimeMs: processingTime,
         },
+        characterTraits: traits,
       });
 
       await this.fusedDataRepository.save(fusedCharacter);

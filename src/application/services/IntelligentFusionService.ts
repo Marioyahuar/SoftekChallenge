@@ -43,6 +43,7 @@ export class IntelligentFusionService {
         apiCallsMade: 0,
         processingTimeMs: 0,
       },
+      characterTraits: traits,
     });
 
     return {

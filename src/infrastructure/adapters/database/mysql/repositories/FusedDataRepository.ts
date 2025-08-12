@@ -2,6 +2,7 @@ import { IFusedDataRepository } from "../../../../../application/ports/repositor
 import { FusedCharacter } from "../../../../../domain/entities/FusedCharacter";
 import { StarWarsCharacter } from "../../../../../domain/entities/StarWarsCharacter";
 import { Pokemon } from "../../../../../domain/entities/Pokemon";
+import { CharacterTraits } from "../../../../../domain/entities/CharacterTraits";
 import { FusionStrategy } from "../../../../../domain/value-objects/FusionStrategy";
 import { MySQLConnection } from "../connection";
 
@@ -166,6 +167,15 @@ export class FusedDataRepository implements IFusedDataRepository {
 
     const fusionStrategy = FusionStrategy.create(row.fusion_strategy);
 
+    // Extract character traits from the stored response
+    const characterTraits = CharacterTraits.create({
+      characterId: row.swapi_character_id,
+      environmentTraits: fullResponse.data.starWarsCharacter.traits.environmentTraits || [],
+      physicalTraits: fullResponse.data.starWarsCharacter.traits.physicalTraits || [],
+      personalityTraits: fullResponse.data.starWarsCharacter.traits.personalityTraits || [],
+      archetypeTraits: fullResponse.data.starWarsCharacter.traits.archetypeTraits || []
+    });
+
     return new FusedCharacter(
       row.id,
       row.created_at.toISOString(),
@@ -184,7 +194,8 @@ export class FusedDataRepository implements IFusedDataRepository {
         cacheHit: row.cache_hit === 1,
         apiCallsMade: row.api_calls_made,
         processingTimeMs: row.processing_time_ms,
-      }
+      },
+      characterTraits
     );
   }
 }

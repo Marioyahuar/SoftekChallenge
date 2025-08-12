@@ -3,6 +3,7 @@ import { Pokemon } from './Pokemon';
 import { FusionScore } from '../value-objects/FusionScore';
 import { CompatibilityLevel } from '../value-objects/CompatibilityLevel';
 import { FusionStrategy } from '../value-objects/FusionStrategy';
+import { CharacterTraits } from './CharacterTraits';
 
 export interface FusionAnalysis {
   fusionScore: number;
@@ -25,7 +26,8 @@ export class FusedCharacter {
     public readonly pokemonCompanion: Pokemon,
     public readonly fusionStrategy: FusionStrategy,
     public readonly fusionAnalysis: FusionAnalysis,
-    public readonly metadata: FusionMetadata
+    public readonly metadata: FusionMetadata,
+    public readonly characterTraits: CharacterTraits
   ) {}
 
   public static create(data: {
@@ -37,6 +39,7 @@ export class FusedCharacter {
     fusionReason: string;
     matchingTraits: string[];
     metadata: FusionMetadata;
+    characterTraits: CharacterTraits;
   }): FusedCharacter {
     const compatibilityLevel = CompatibilityLevel.create(data.fusionScore.getValue());
     
@@ -52,7 +55,8 @@ export class FusedCharacter {
         matchingTraits: data.matchingTraits,
         compatibilityLevel: compatibilityLevel.getValue(),
       },
-      data.metadata
+      data.metadata,
+      data.characterTraits
     );
   }
 
@@ -74,10 +78,10 @@ export class FusedCharacter {
           mass: this.starWarsCharacter.mass,
           homeworld: this.starWarsCharacter.homeworld,
           traits: {
-            environmentTraits: [],
-            physicalTraits: [],
-            personalityTraits: [],
-            archetypeTraits: []
+            environmentTraits: this.characterTraits.environmentTraits,
+            physicalTraits: this.characterTraits.physicalTraits,
+            personalityTraits: this.characterTraits.personalityTraits,
+            archetypeTraits: this.characterTraits.archetypeTraits
           }
         },
         pokemonCompanion: {
