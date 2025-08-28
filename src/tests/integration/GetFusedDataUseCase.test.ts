@@ -7,6 +7,7 @@ import { HybridCacheService } from "../../application/services/HybridCacheServic
 import { StarWarsCharacter } from "../../domain/entities/StarWarsCharacter";
 import { Pokemon } from "../../domain/entities/Pokemon";
 import { CharacterTraits } from "../../domain/entities/CharacterTraits";
+import { Mock } from "node:test";
 
 // Mock implementations
 class MockTraitMappingRepository {
@@ -17,9 +18,33 @@ class MockTraitMappingRepository {
   async findActiveByTraitName(traitName: string): Promise<any[]> {
     // Return mock mappings for common traits
     const mockMappings: Record<string, any[]> = {
-      'heroic': [{ pokemonId: 25, weight: 0.95, traitName: 'heroic', category: 'personality', reasoning: 'Mock heroic mapping' }],
-      'desert': [{ pokemonId: 27, weight: 0.9, traitName: 'desert', category: 'environment', reasoning: 'Mock desert mapping' }],
-      'human': [{ pokemonId: 25, weight: 0.8, traitName: 'human', category: 'physical', reasoning: 'Mock human mapping' }],
+      heroic: [
+        {
+          pokemonId: 25,
+          weight: 0.95,
+          traitName: "heroic",
+          category: "personality",
+          reasoning: "Mock heroic mapping",
+        },
+      ],
+      desert: [
+        {
+          pokemonId: 27,
+          weight: 0.9,
+          traitName: "desert",
+          category: "environment",
+          reasoning: "Mock desert mapping",
+        },
+      ],
+      human: [
+        {
+          pokemonId: 25,
+          weight: 0.8,
+          traitName: "human",
+          category: "physical",
+          reasoning: "Mock human mapping",
+        },
+      ],
     };
     return mockMappings[traitName] || [];
   }
@@ -58,11 +83,20 @@ class MockFusedDataRepository {
     return null;
   }
 
-  async findByUserId(userId: string, page: number, limit: number): Promise<any> {
+  async findByUserId(
+    userId: string,
+    page: number,
+    limit: number
+  ): Promise<any> {
     return { data: [], total: 0, page, limit };
   }
 
-  async findAll(page: number, limit: number, sortBy?: string, order?: 'asc' | 'desc'): Promise<any> {
+  async findAll(
+    page: number,
+    limit: number,
+    sortBy?: string,
+    order?: "asc" | "desc"
+  ): Promise<any> {
     return { data: [], total: 0, page, limit };
   }
 
@@ -97,6 +131,28 @@ class MockCharacterTraitsRepository {
   }
 }
 
+class MockSwapiCharacterRepository {
+  async save(character: any): Promise<void> {
+    // Mock implementation - just return success
+  }
+
+  async findById(id: number): Promise<any> {
+    return null;
+  }
+
+  async findAll(): Promise<any[]> {
+    return [];
+  }
+
+  async update(character: any): Promise<void> {
+    // Mock implementation
+  }
+
+  async delete(id: number): Promise<void> {
+    // Mock implementation
+  }
+}
+
 // Mock services
 const mockSwapiService = {
   getCharacter: jest.fn(),
@@ -121,15 +177,20 @@ describe("GetFusedDataUseCase Integration", () => {
   let pokemonMatchingService: PokemonMatchingService;
   let fusedDataRepository: MockFusedDataRepository;
   let characterTraitsRepository: MockCharacterTraitsRepository;
+  let swapiCharacterRepository: MockSwapiCharacterRepository;
 
   beforeEach(() => {
     jest.clearAllMocks();
 
     traitExtractionService = new TraitExtractionService();
     const mockTraitMappingRepository = new MockTraitMappingRepository();
-    pokemonMatchingService = new PokemonMatchingService(mockPokeApiService, mockTraitMappingRepository);
+    pokemonMatchingService = new PokemonMatchingService(
+      mockPokeApiService,
+      mockTraitMappingRepository
+    );
     fusedDataRepository = new MockFusedDataRepository();
     characterTraitsRepository = new MockCharacterTraitsRepository();
+    swapiCharacterRepository = new MockSwapiCharacterRepository();
 
     useCase = new GetFusedDataUseCase(
       mockSwapiService,
@@ -138,7 +199,8 @@ describe("GetFusedDataUseCase Integration", () => {
       pokemonMatchingService,
       mockCacheService,
       fusedDataRepository,
-      characterTraitsRepository
+      characterTraitsRepository,
+      swapiCharacterRepository
     );
   });
 
@@ -172,7 +234,10 @@ describe("GetFusedDataUseCase Integration", () => {
 
       // Setup mocks
       mockCacheService.getFusionResult.mockResolvedValue(null); // Cache miss
-      mockSwapiService.getCharacter.mockResolvedValue({ character: mockCharacter, apiCallsCount: 3 });
+      mockSwapiService.getCharacter.mockResolvedValue({
+        character: mockCharacter,
+        apiCallsCount: 3,
+      });
       mockPokeApiService.getPokemon.mockResolvedValue(mockPokemon);
       mockCacheService.storeCharacterTraits.mockResolvedValue(undefined);
       mockCacheService.storePokemonData.mockResolvedValue(undefined);
@@ -268,7 +333,10 @@ describe("GetFusedDataUseCase Integration", () => {
         weight: 69,
       });
 
-      mockSwapiService.getCharacter.mockResolvedValue({ character: mockCharacter, apiCallsCount: 3 });
+      mockSwapiService.getCharacter.mockResolvedValue({
+        character: mockCharacter,
+        apiCallsCount: 3,
+      });
       mockPokeApiService.getPokemon.mockResolvedValue(mockPokemon);
       mockCacheService.storeCharacterTraits.mockResolvedValue(undefined);
       mockCacheService.storePokemonData.mockResolvedValue(undefined);
@@ -334,8 +402,8 @@ describe("GetFusedDataUseCase Integration", () => {
       });
 
       mockSwapiService.getCharacter
-        .mockResolvedValueOnce(mockCharacter1)
-        .mockResolvedValueOnce(mockCharacter2);
+        .mockResolvedValueOnce({ character: mockCharacter1, apiCallsCount: 3 })
+        .mockResolvedValueOnce({ character: mockCharacter2, apiCallsCount: 3 });
 
       mockPokeApiService.getPokemon.mockResolvedValue(mockPokemon);
       mockCacheService.storeCharacterTraits.mockResolvedValue(undefined);
@@ -394,7 +462,8 @@ describe("GetFusedDataUseCase Integration", () => {
         pokemonMatchingService,
         mockCacheService,
         fusedDataRepository,
-        characterTraitsRepository
+        characterTraitsRepository,
+        swapiCharacterRepository
       );
 
       mockCacheService.getFusionResult.mockResolvedValue(null);
@@ -424,7 +493,10 @@ describe("GetFusedDataUseCase Integration", () => {
         weight: 60,
       });
 
-      mockSwapiService.getCharacter.mockResolvedValue({ character: mockCharacter, apiCallsCount: 3 });
+      mockSwapiService.getCharacter.mockResolvedValue({
+        character: mockCharacter,
+        apiCallsCount: 3,
+      });
       mockPokeApiService.getPokemon.mockResolvedValue(mockPokemon);
       mockCacheService.storeCharacterTraits.mockResolvedValue(undefined);
       mockCacheService.storePokemonData.mockResolvedValue(undefined);
